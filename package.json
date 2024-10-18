@@ -1,0 +1,12 @@
+{
+  "name": "minirdx",
+  "version": "0.1.0",
+  "description": "Library for state management inspired by Redux & pubsub design pattern.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

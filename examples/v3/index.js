@@ -10,12 +10,12 @@ const counterStore = createStore({
     showLoader: false,
   },
 
-  increment: (state, payload) => {
-    return { ...state, counter: state.counter + payload };
+  increment: (state, count) => {
+    return { ...state, counter: state.counter + count };
   },
 
-  decrement: (state, payload) => {
-    return { ...state, counter: state.counter - payload };
+  decrement: (state, count) => {
+    return { ...state, counter: state.counter - count };
   },
 
   reset: (state) => {
@@ -26,17 +26,57 @@ const counterStore = createStore({
     return { ...state, showLoader: !state.showLoader };
   },
 
-  asyncUpdate: async (state) => {
+  asyncIncrement: async (state) => {
     const amount = await getRandomAmout();
     return { ...state, counter: state.counter + amount };
   },
+
+  asyncDecrement: (state) =>
+    Promise.resolve({ ...state, counter: state.counter - 5 }),
 });
 
 // ---- Usage ------------------
 
-const cancelGlobalSub = counterStore.on((state) =>
-  console.log("State updated:", state)
-);
+const counter = document.getElementById("counter");
+const buttons = document.getElementById("buttons");
+
+buttons.addEventListener("click", async (event) => {
+  switch (event.target.dataset.action) {
+    case "inc":
+      return counterStore.increment(1);
+    case "dec":
+      return counterStore.decrement(1);
+    case "asyncInc":
+      console.log("Async inc start");
+      await counterStore.asyncIncrement();
+      console.log("Async inc end");
+      return;
+    case "asyncDec":
+      console.log("Async dec start");
+      await counterStore.asyncDecrement();
+      console.log("Async dec end");
+      return;
+    case "show":
+      return console.log(counterStore.getState());
+  }
+});
+
+const cancelGlobalSub = counterStore.on((state, actionName) => {
+  console.log(`State ${actionName}:`, state);
+  counter.innerHTML = state.counter;
+});
+
+function getRandomAmout() {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(Math.floor(Math.random() * 10));
+    }, 1000);
+  });
+}
+
+/*
+
+
 
 const cancelIncSub = counterStore.on(
   "increment",
@@ -67,9 +107,10 @@ const cancelIncTap = counterStore.tap(
   // This would be a nice way to handle async actions.
   // THe async action should return a promise thate resolves when the action is done.
   counterStore.toggleLoader();
-  await counterStore.asyncUpdate();
+  await counterStore.asyncIncrement();
   counterStore.toggleLoader();
 })();
+*/
 
 /*
 
@@ -105,13 +146,3 @@ counterStore.subscribe("setEmoji", (state) =>
 counterStore.setEmoji("🎉");
 counterStore.setDeepEmoji();
 */
-
-// ---- Helpers ----------------
-
-function getRandomAmout() {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(Math.floor(Math.random() * 10));
-    }, 1000);
-  });
-}

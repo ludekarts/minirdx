@@ -1,12 +1,30 @@
 {
   "name": "minirdx",
-  "version": "0.2.0",
+  "version": "0.3.0-alpha.0",
   "description": "Library for state management inspired by Redux & pubsub design pattern.",
-  "main": "src/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "vite build --watch",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/minirdx.umd.cjs",
+  "module": "./dist/minirdx.js",
+  "types": "./dist/minirdx.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/minirdx.js",
+      "require": "./dist/minirdx.umd.cjs"
+    }
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC"
+  "author": "Wojciech Ludwin << @ludekarts >>",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.5.3",
+    "vite": "^5.4.1",
+    "vite-plugin-dts": "^4.2.1"
+  }
 }

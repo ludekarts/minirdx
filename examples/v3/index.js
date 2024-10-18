@@ -66,6 +66,23 @@ const cancelGlobalSub = counterStore.on((state, actionName) => {
   counter.innerHTML = state.counter;
 });
 
+const cancelIncSub = counterStore.on("increment", (state) =>
+  console.log("⬆️", state.counter)
+);
+
+const cancelDecSub = counterStore.on("decrement", (state) =>
+  console.log("⬇️", state.counter)
+);
+
+const cancelIncTap = counterStore.tap(
+  "increment",
+  "tapped",
+  ({ state, slice }) => {
+    console.log("Tapped:", slice);
+    return state.counter > 3;
+  }
+);
+
 function getRandomAmout() {
   return new Promise((resolve) => {
     setTimeout(() => {
@@ -73,44 +90,6 @@ function getRandomAmout() {
     }, 1000);
   });
 }
-
-/*
-
-
-
-const cancelIncSub = counterStore.on(
-  "increment",
-  (state) => state.counter,
-  (counter) => console.log("⬆️", counter)
-);
-
-const cancelDecSub = counterStore.on(
-  "decrement",
-  (state) => state.counter,
-  (counter) => console.log("⬇️", counter)
-);
-
-const cancelIncTap = counterStore.tap(
-  "increment",
-  "tapped",
-  ({ state, slice, payload }) => {
-    return state.counter > 5;
-  }
-);
-
-(async function App() {
-  counterStore.increment(1);
-  counterStore.increment(1);
-  counterStore.increment(3);
-  counterStore.decrement(1);
-
-  // This would be a nice way to handle async actions.
-  // THe async action should return a promise thate resolves when the action is done.
-  counterStore.toggleLoader();
-  await counterStore.asyncIncrement();
-  counterStore.toggleLoader();
-})();
-*/
 
 /*
 

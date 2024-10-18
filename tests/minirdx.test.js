@@ -1,4 +1,4 @@
-import { createReducer, createStore, createSelector } from "./minirdx.js";
+import { createReducer, createStore, createSelector } from "../src/minirdx.js";
 
 const { expect } = window.chai;
 

@@ -1,387 +1,513 @@
-import { createReducer, createStore, createSelector } from "../src/minirdx.js";
+import { createStore } from "../src/minirdx.js";
 
 const { expect } = window.chai;
 
-const action = (type, payload) => ({ type, payload });
-
-describe("MiniRDX", () => {
-  it("CreateReducer:: Should create 'empty' reducer", () => {
-    const state = { name: "state" };
-    const mainReducer = createReducer(state).done();
-    expect(mainReducer).to.be.instanceOf(Function);
-    expect(mainReducer(state, {})).to.have.property("name", "state");
+describe("MiniRDX createStore()", () => {
+  it("Should be a function", () => {
+    expect(createStore).to.be.a("function");
   });
 
-  it("CreateReducer:: Should create reducer handling 'update' action", () => {
-    const state = { name: "state" };
-    const mainReducer = createReducer(state)
-      .on("update", (state, name) => {
-        return { ...state, name };
-      })
-      .done();
-
-    const newState = mainReducer(state, action("update", "newState"));
-    expect(newState).to.have.property("name", "newState");
-
-    const finalState = mainReducer(newState, action("update", "anotherState"));
-    expect(finalState).to.have.property("name", "anotherState");
+  it("Should require proper 'config' object", () => {
+    expect(() => createStore()).to.throw();
+    expect(() => createStore({})).to.throw();
+    expect(() => createStore({ actions: {} })).to.not.throw();
   });
 
-  it("CreateReducer:: Should create reducer handling multiple actions", () => {
-    const state = {
-      name: "state",
-      counter: 0,
-    };
-
-    const mainReducer = createReducer(state)
-      .on("update", (state, name) => {
-        return { ...state, name };
-      })
-      .on("increment", (state) => {
-        state.counter = state.counter + 1;
-        return state;
-      })
-      .done();
-
-    const newState = mainReducer(state, action("update", "newState"));
-    expect(newState).to.have.property("name", "newState");
-
-    const finalState = mainReducer(newState, action("increment"));
-    expect(finalState).to.have.property("counter", 1);
-  });
-
-  it("CreateReducer:: Should return initState if reducing state is undefined", () => {
-    const initState = {
-      name: "initState",
-    };
-
-    const mainReducer = createReducer(initState).done();
-
-    expect(mainReducer(undefined, {})).to.equal(initState);
-  });
-
-  it("CreateReducer:: Should throw when state or acrion are not applied", () => {
-    const mainReducer = createReducer().done();
-    expect(() => mainReducer()).to.throw();
-  });
-
-  it("CreateReducer:: Should throw if two or more cases try to handle same action", () => {
-    const identity = (a) => a;
-    const create = () =>
-      createReducer().on("action", identity).on("action", identity).done();
-    expect(create).to.throw();
-  });
-
-  it("CreateReducer:: When creating new case it should throw if action is not a 'string'", () => {
-    const create = () =>
-      createReducer()
-        .on(10, () => {})
-        .done();
-    expect(create).to.throw();
-  });
-
-  it("CreateReducer:: When creating new case it should throw if reducer is not a 'function'", () => {
-    const create = () => createReducer().on("action_name", {}).done();
-    expect(create).to.throw();
-  });
-
-  it("ExtendReducer:: Should extend main reducer", () => {
-    const initState = {
-      hello: "world",
-    };
-
-    const mainReducer = createReducer(initState).done();
-    const store = createStore(mainReducer);
-
-    // Check for proper initial state.
-    expect(store.getState()).to.have.property("hello", "world");
-
-    // ---- Extend ------------
-
-    const extendState = {
-      some: {
-        deep: {
-          value: "👻",
+  it("Should require proper 'action' format", () => {
+    expect(() =>
+      createStore({
+        actions: {
+          INCREMENT: "INC",
         },
-      },
-    };
-
-    // Define new extended reducer.
-    const extendedReducer = createReducer(extendState).done();
-
-    store.extendReducer(extendedReducer, "ext");
-
-    // Check for extended state.
-    expect(store.getState()).to.have.property("ext");
-    expect(store.getState().ext.some.deep).to.have.property("value", "👻");
-  });
-
-  it("ExtendReducer:: Should handle actions from extended reducer", () => {
-    const initState = {
-      hello: "world",
-    };
-
-    const mainReducer = createReducer(initState).done();
-    const store = createStore(mainReducer);
-
-    // Check for proper initial state.
-    expect(store.getState()).to.have.property("hello", "world");
-
-    // ---- Extend ------------
-
-    const extendState = {
-      some: {
-        deep: {
-          value: "👻",
-        },
-      },
-    };
-
-    // Define new extended reducer.
-    const extendedReducer = createReducer(extendState)
-      .on("update_extended", (state) => {
-        state.some.deep.value = "🦖";
-        return { ...state };
       })
-      .done();
+    ).to.throw();
 
-    store.extendReducer(extendedReducer, "ext");
-
-    store.dispatch("update_extended");
-
-    expect(store.getState().ext.some.deep).to.have.property("value", "🦖");
-  });
-
-  it("ExtendReducer:: Should update global state from extended reducer", () => {
-    const initState = {
-      hello: "world",
-    };
-
-    const mainReducer = createReducer(initState).done();
-    const store = createStore(mainReducer);
-
-    // Check for proper initial state.
-    expect(store.getState()).to.have.property("hello", "world");
-
-    // ---- Extend ------------
-
-    const extendState = {
-      some: {
-        deep: {
-          value: "👻",
-        },
-      },
-    };
-
-    // Define new extended reducer.
-    const extendedReducer = createReducer(extendState)
-      .on("update_global", (state) => (globalState) => ({
-        ...globalState,
-        hello: "🍕",
-      }))
-      .done();
-
-    store.extendReducer(extendedReducer, "ext");
-
-    store.dispatch("update_global");
-
-    expect(store.getState()).to.have.property("hello", "🍕");
-  });
-
-  it("ExtendReducer:: Should extend reducer but not override default state", () => {
-    const initState = {
-      hello: "world",
-    };
-
-    const mainReducer = createReducer(initState).done();
-    const store = createStore(mainReducer);
-
-    // Check for proper initial state.
-    expect(store.getState()).to.have.property("hello", "world");
-
-    // ---- Extend ------------
-
-    const extendState = {
-      some: {
-        deep: {
-          value: "👻",
-        },
-      },
-    };
-
-    // Define new extended reducer.
-    const extendedReducer = createReducer(extendState).done();
-    store.extendReducer(extendedReducer, "ext");
-    expect(store.getState().ext.some.deep).to.have.property("value", "👻");
-
-    // ---- Extend 2 ------------
-
-    const hookReducer = createReducer()
-      .on("update_hook", (state) => {
-        return "🦖";
+    expect(() =>
+      createStore({
+        actions: [],
       })
-      .done();
+    ).to.throw();
 
-    // Define another extended reducer which only modify part of global state.
-    store.extendReducer(hookReducer, "ext.some.deep.value");
-    store.dispatch("update_hook");
-    expect(store.getState().ext.some.deep).to.have.property("value", "🦖");
-  });
-
-  it("ExtendReducer:: Should connect to global state without overriding it", () => {
-    const initState = {
-      hello: "world",
-    };
-
-    const mainReducer = createReducer(initState).done();
-    const store = createStore(mainReducer);
-
-    // Check for proper initial state.
-    expect(store.getState()).to.have.property("hello", "world");
-
-    // ---- Extend ------------
-
-    // Define new extended reducer.
-    const extendedReducer = createReducer({ bad: "state" })
-      .on("update_global", (state) => {
-        return {
-          ...state,
-          hello: "there",
-        };
+    expect(() =>
+      createStore({
+        actions: {
+          INCREMENT: () => {},
+        },
       })
-      .done();
-
-    store.extendReducer(extendedReducer);
-    expect(store.getState()).to.not.have.property("bad", "state");
-
-    store.dispatch("update_global");
-    expect(store.getState()).to.have.property("hello", "there");
+    ).to.not.throw();
   });
 
-  it("Store:: Should allow to subscribe to Store updates", () => {
-    const mainReducer = createReducer({})
-      .on("update", () => ({}))
-      .done();
-
-    const store = createStore(mainReducer);
-    const spy = chai.spy();
-    store.subscribe(spy);
-    store.dispatch("update");
-    store.dispatch("update");
-    expect(spy).to.have.been.called(2);
-  });
-
-  it("Store:: Subscriber should recieve new state object along with dispatched action", () => {
-    const newState = { isNew: true };
-
-    const mainReducer = createReducer({})
-      .on("update", () => newState)
-      .done();
-
-    const store = createStore(mainReducer);
-    const spy = chai.spy();
-    store.subscribe(spy);
-    store.dispatch("update");
-    store.dispatch("update");
-    expect(spy).to.have.been.called(2);
-    expect(spy).to.have.been.called.with(newState, {
-      type: "update",
-      payload: undefined,
+  it("Should create valid Store object", () => {
+    const store = createStore({
+      actions: {},
     });
+
+    expect(store).to.have.property("middleware");
+    expect(store).to.have.property("subscribe");
+    expect(store).to.have.property("getState");
+    expect(store).to.have.property("extend");
+    expect(store).to.have.property("dispatch");
+
+    expect(store.middleware).to.be.a("function");
+    expect(store.subscribe).to.be.a("function");
+    expect(store.getState).to.be.a("function");
+    expect(store.extend).to.be.a("function");
+    expect(store.dispatch).to.be.a("function");
+    expect(store.dispatch.batch).to.be.a("function");
   });
 
-  it("Store:: Should dipatch multiple actions as one batch", () => {
-    const initState = {
-      counter: 0,
-      title: "none",
-    };
+  it("Should create initial state", () => {
+    const store = createStore({
+      actions: {},
+      state: {
+        counter: 0,
+        message: "hello",
+      },
+    });
 
-    const mainReducer = createReducer(initState)
-      .on("add", (state) => {
-        state.counter++;
-        return { ...state };
-      })
-      .on("subtract", (state) => {
-        state.counter--;
-        return { ...state };
-      })
-      .on("rename", (state, title) => {
-        return { ...state, title };
-      })
-      .done();
-
-    const store = createStore(mainReducer);
-    const spyStoreListener = chai.spy();
-
-    store.subscribe(spyStoreListener);
-
-    store.dispatch.batch(["add"], ["add"], ["subtract"], ["rename", "batch"]);
-
-    expect(spyStoreListener).to.have.been.called.once;
-    expect(store.getState()).to.have.property("counter", 1);
-    expect(store.getState()).to.have.property("title", "batch");
+    const state = store.getState();
+    expect(state).to.have.property("counter");
+    expect(state).to.have.property("message");
+    expect(state.counter).to.equal(0);
+    expect(state.message).to.equal("hello");
   });
+});
 
-  it("Store:: Should dipatch action with miltiple payload arguments", () => {
-    const initState = {};
-    const spy = chai.spy();
-    const mainReducer = createReducer(initState).on("update", spy).done();
-
-    const store = createStore(mainReducer);
-    store.dispatch("update", "a", 2, "c");
-    expect(spy).to.have.been.called(1);
-    expect(spy).to.have.been.called.with(initState, "a", 2, "c");
-  });
-
-  it("Store:: Subscriber should recieve new state object along with list of dispatched action (batch dispatch)", () => {
-    const newState = { isNew: true };
-    const actions = [
-      { type: "this", payload: undefined },
-      { type: "is", payload: undefined },
-      { type: "batch", payload: true },
-    ];
-
-    const mainReducer = createReducer({})
-      .on("is", () => newState) // Any action from batch list will trigger subscriber.
-      .done();
-
-    const store = createStore(mainReducer);
-    const spy = chai.spy();
-    store.subscribe(spy);
-    store.dispatch.batch(["this"], ["is"], ["batch", true]);
-    expect(spy).to.have.been.called.with(newState, actions);
-  });
-
-  it("Create Selector:: Should fail with invalid selector", () => {
-    expect(() => createSelector("alert(1);")).to.throw();
-  });
-
-  it("Create Selector:: Should create various selectros", () => {
-    expect(() => createSelector("a")).to.not.throw();
-    expect(() => createSelector("a[0]")).to.not.throw();
-    expect(() => createSelector("a.b.c")).to.not.throw();
-    expect(() => createSelector("a.b[1].c[2]")).to.not.throw();
-  });
-
-  it("Create Selector:: Should create propper getter & setter", () => {
-    const state = {
-      user: {
-        name: "John",
-        age: 25,
-        address: {
-          city: "London",
-          street: "Baker Street",
+describe("MiniRDX dispatch()", () => {
+  it("Should dispatch INCREMENT action w/ given payload", () => {
+    const store = createStore({
+      actions: {
+        INCREMENT(state, payload) {
+          return {
+            ...state,
+            counter: state.counter + payload,
+          };
         },
       },
-    };
+      state: {
+        counter: 0,
+      },
+    });
 
-    const { getter, setter } = createSelector("user.address.city");
+    store.dispatch("INCREMENT", 1);
+    expect(store.getState().counter).to.equal(1);
 
-    // Getter.
-    expect(getter(state)).to.equal("London");
+    store.dispatch("INCREMENT", 2);
+    expect(store.getState().counter).to.equal(3);
+  });
 
-    // Setter.
-    setter(state, "New York");
-    expect(getter(state)).to.equal("New York");
+  it("Should dispatch INCREMENT action w/ any number of payload args", () => {
+    const actionSpy = chai.spy();
+    const store = createStore({
+      actions: {
+        INCREMENT: (state, ...payload) => {
+          actionSpy(...payload);
+          return state;
+        },
+      },
+      state: {
+        counter: 0,
+      },
+    });
+
+    store.dispatch("INCREMENT", 1);
+    expect(actionSpy).to.have.been.called.with(1);
+
+    store.dispatch("INCREMENT", 2, 3);
+    expect(actionSpy).to.have.been.called.with(2, 3);
+
+    store.dispatch("INCREMENT", 4, 5, "VI");
+    expect(actionSpy).to.have.been.called.with(4, 5, "VI");
+  });
+
+  it("Should dispatch BATCH INCREMENT action w/ given payload", () => {
+    const store = createStore({
+      actions: {
+        INCREMENT(state, payload) {
+          return {
+            ...state,
+            counter: state.counter + payload,
+          };
+        },
+      },
+      state: {
+        counter: 0,
+      },
+    });
+
+    store.dispatch.batch(["INCREMENT", 1], ["INCREMENT", 2], ["INCREMENT", 3]);
+    expect(store.getState().counter).to.equal(6);
+  });
+});
+
+describe("MiniRDX subscribe()", () => {
+  it("Should subscribe to store ", () => {
+    const store = createStore({
+      actions: {
+        INCREMENT(state) {
+          return state;
+        },
+      },
+      state: {
+        counter: 0,
+      },
+    });
+
+    const initState = store.getState();
+    const storeSpy = chai.spy((state, action) => {
+      expect(state).to.equal(initState);
+      expect(action.type).to.equal("INCREMENT");
+      expect(action.payload).to.be.undefined;
+    });
+
+    store.subscribe(storeSpy);
+
+    store.dispatch("INCREMENT");
+
+    expect(storeSpy).to.have.been.called.once;
+  });
+
+  it("Should subscribe to given action in store ", () => {
+    const store = createStore({
+      actions: {
+        INCREMENT(state) {
+          return state;
+        },
+        DECREMENT(state) {
+          return state;
+        },
+      },
+      state: {
+        counter: 0,
+      },
+    });
+
+    const initState = store.getState();
+    const storeSpy = chai.spy();
+    const storeIncSpy = chai.spy((state, action) => {
+      expect(state).to.equal(initState);
+      expect(action.type).to.equal("INCREMENT");
+      expect(action.payload).to.be.undefined;
+    });
+
+    store.subscribe("INCREMENT", storeIncSpy);
+    store.subscribe(storeSpy);
+    store.dispatch("INCREMENT");
+    store.dispatch("DECREMENT");
+
+    expect(storeIncSpy).to.have.been.called.once;
+    expect(storeSpy).to.have.been.called.twice;
+  });
+});
+
+describe("MiniRDX extend()", () => {
+  it("Shoudld extend store w/ new state and actions", () => {
+    const store = createStore({
+      actions: {},
+      state: {
+        counter: 0,
+      },
+    });
+
+    store.extend("extended", {
+      state: {
+        isExtended: true,
+      },
+      actions: {
+        TOGGLE(state) {
+          return {
+            ...state,
+            isExtended: !state.isExtended,
+          };
+        },
+      },
+    });
+
+    store.dispatch("TOGGLE");
+
+    const state = store.getState();
+    expect(state).to.have.property("counter");
+    expect(state).to.have.property("extended");
+    expect(state.extended).to.have.property("isExtended");
+    expect(state.extended.isExtended).to.equal(false);
+  });
+
+  it("Shoudld extend nested store props", () => {
+    const store = createStore({
+      actions: {},
+      state: {
+        counter: 0,
+        extended: {
+          deep: {
+            isExtended: true,
+          },
+        },
+      },
+    });
+
+    store.extend("extended.deep.value", {
+      state: "🔌",
+      actions: {
+        TOGGLE_PLUG(state) {
+          return state === "🔌" ? "🔋" : "🔌";
+        },
+      },
+    });
+
+    const state = store.getState();
+    expect(state).to.have.property("counter");
+    expect(state).to.have.property("extended");
+    expect(state.extended).to.have.property("deep");
+    expect(state.extended.deep).to.have.property("value");
+    expect(state.extended.deep).to.have.property("isExtended");
+    expect(state.extended.deep.value).to.equal("🔌");
+
+    store.dispatch("TOGGLE_PLUG");
+    expect(store.getState().extended.deep.value).to.equal("🔋");
+  });
+
+  it("Shoudld extend global state w/ more actions", () => {
+    const store = createStore({
+      actions: {},
+      state: {
+        counter: 0,
+      },
+    });
+
+    expect(store.getState()).to.have.property("counter");
+
+    store.extend({
+      state: {
+        extended: true,
+      },
+      actions: {
+        UPDATE_AND_EXTEND() {
+          return {
+            counter: 10,
+            extended: true,
+          };
+        },
+      },
+    });
+
+    // Extend extended state should not override/add new values to global state.
+    expect(store.getState()).to.not.have.property("extended");
+
+    store.dispatch("UPDATE_AND_EXTEND");
+
+    expect(store.getState().counter).to.equal(10);
+    expect(store.getState().extended).to.equal(true);
+  });
+});
+
+describe("MiniRDX middleware()", () => {
+  it("Should apply middleware ", () => {
+    const store = createStore({
+      actions: {
+        INCREMENT(state) {
+          return {
+            ...state,
+            counter: state.counter + 1,
+          };
+        },
+        DECREMENT(state) {
+          return {
+            ...state,
+            counter: state.counter - 1,
+          };
+        },
+      },
+      state: {
+        counter: 0,
+      },
+    });
+
+    const middlewareSpy = chai.spy(
+      ({ state, actionName, globalState, payload }) => {
+        expect(payload).to.be.undefined;
+        expect(actionName).to.equal("DECREMENT");
+        // Assert globalState is Global not Local.
+        expect(globalState).to.have.property("counter");
+        // Global State contains values from after action's update.
+        expect(globalState.counter).to.equal(2);
+        // Local State contains value from after action's update.
+        expect(state).to.equal(2);
+      }
+    );
+
+    store.middleware("DECREMENT", "counter", middlewareSpy);
+
+    store.dispatch("INCREMENT");
+    store.dispatch("INCREMENT");
+    store.dispatch("INCREMENT");
+    store.dispatch("DECREMENT");
+    expect(middlewareSpy).to.have.been.called.once;
+  });
+
+  it("Should modify state w/ ASYNC middleware", () => {
+    const store = createStore({
+      actions: {
+        INCREMENT(state) {
+          return {
+            ...state,
+            counter: state.counter + 1,
+          };
+        },
+        DECREMENT(state) {
+          return {
+            ...state,
+            counter: state.counter - 1,
+          };
+        },
+      },
+      state: {
+        counter: 0,
+      },
+    });
+
+    const storeSpy = chai.spy();
+
+    store.middleware("DECREMENT", "counter", () => Promise.resolve(0));
+
+    store.subscribe(storeSpy);
+
+    store.subscribe("DECREMENT", (state) => {
+      // Run expect after async middleware resolves last action.
+      expect(state.counter).to.equal(0);
+      expect(storeSpy).to.have.been.called.exactly(4);
+    });
+
+    store.dispatch("INCREMENT");
+    store.dispatch("INCREMENT");
+    store.dispatch("INCREMENT");
+    store.dispatch("DECREMENT");
+  });
+
+  it("Should modify state w/ SYNC middleware", () => {
+    const store = createStore({
+      actions: {
+        INCREMENT(state) {
+          return {
+            ...state,
+            counter: state.counter + 1,
+          };
+        },
+        DECREMENT(state) {
+          return {
+            ...state,
+            counter: state.counter - 1,
+          };
+        },
+      },
+      state: {
+        counter: 0,
+      },
+    });
+
+    const storeSpy = chai.spy();
+    store.middleware("DECREMENT", "counter", () => 0);
+
+    store.subscribe(storeSpy);
+
+    store.subscribe("DECREMENT", (state) => {
+      // Run expect after async middleware resolves last action.
+      expect(state.counter).to.equal(0);
+      expect(storeSpy).to.have.been.called.exactly(4);
+    });
+
+    store.dispatch("INCREMENT");
+    store.dispatch("INCREMENT");
+    store.dispatch("INCREMENT");
+    store.dispatch("DECREMENT");
+  });
+
+  it("Should modify EXTENDED state w/ middleware", () => {
+    const store = createStore({
+      actions: {},
+      state: {
+        counter: 0,
+        extended: {
+          deep: {
+            isExtended: true,
+          },
+        },
+      },
+    });
+
+    store.extend("extended.deep.value", {
+      state: "🔌",
+      actions: {
+        LOLLIPOP(state) {
+          return state === "🔌" ? "🔋" : "🔌";
+        },
+      },
+    });
+
+    store.middleware("LOLLIPOP", "extended.deep.value", () => "🍭");
+
+    store.subscribe("LOLLIPOP", (state) => {
+      expect(state.extended.deep).to.have.property("value");
+      expect(state.extended.deep.value).to.equal("🍭");
+    });
+
+    store.dispatch("LOLLIPOP");
+  });
+
+  it("Should modify EXTENDED state w/ ASYNC middleware on BATCH update", () => {
+    const store = createStore({
+      actions: {},
+      state: {
+        counter: 0,
+        extended: {
+          deep: {
+            isExtended: true,
+          },
+        },
+      },
+    });
+
+    store.extend("extended.deep.counter", {
+      state: 0,
+      actions: {
+        INCREMENT(state) {
+          return state + 1;
+        },
+      },
+    });
+
+    store.middleware("CHARGE", "extended.deep.counter", ({ state }) =>
+      Promise.resolve(state + 100)
+    );
+
+    const incMiddlewareSpy = chai.spy();
+
+    store.middleware("INCREMENT", "extended.deep.counter", ({ state }) => {
+      incMiddlewareSpy();
+      return Promise.resolve(state);
+    });
+
+    const state = store.getState();
+    expect(state.extended.deep).to.have.property("counter");
+    expect(state.extended.deep.counter).to.equal(0);
+
+    const storeActionSpy = chai.spy();
+
+    store.subscribe("INCREMENT", storeActionSpy);
+    store.subscribe("CHARGE", storeActionSpy);
+    store.subscribe("DONE", () => {
+      storeActionSpy();
+      // ⚠️ Batch updates will not agregate calls for middlewares asociated w/ duplicated actions.
+      expect(incMiddlewareSpy).to.have.been.called.exactly(3);
+      // ⚠️ Batch updates will agregate calls for duplicated actions.
+      expect(storeActionSpy).to.have.been.called.exactly(3);
+    });
+
+    store.dispatch.batch(
+      ["INCREMENT"],
+      ["INCREMENT"],
+      ["CHARGE"],
+      ["INCREMENT"],
+      ["DONE"]
+    );
   });
 });

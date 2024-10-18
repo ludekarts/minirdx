@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MiniRDX v2</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 18px;
+      }
+
+      body {
+        text-align: center;
+        color: #808080;
+        background-color: #1d1d25;
+      }
+
+      button {
+        border: none;
+        min-width: 2.2rem;
+        color: inherit;
+        cursor: pointer;
+        padding: 0.3rem;
+        font-size: 0.9em;
+        font-weight: bold;
+        border-radius: 0.3rem;
+        background-color: #571e8f;
+        transition: filter 0.3s ease;
+
+        &:hover {
+          filter: brightness(0.8);
+        }
+      }
+
+      .rail {
+        gap: 0.5rem;
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 style="text-align: center; padding: 1rem">
+      MiniRDX (<a href="./tests/index.html">tests</a>)
+    </h1>
+
+    <section>
+      <div class="rail">
+        <button id="incBtn">+</button>
+        <button id="decBtn">-</button>
+        <button id="resetBtn">0</button>
+        <button id="toggleBtn">TOGGLE</button>
+        <button id="batchBtn">BATCH +</button>
+        <button id="setBtn">SET 😀</button>
+      </div>
+      <pre id="display"></pre>
+    </section>
+    <script type="module" src="./index.js"></script>
+  </body>
+</html>

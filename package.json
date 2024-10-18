@@ -1,6 +1,6 @@
 {
   "name": "minirdx",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Library for state management inspired by Redux & pubsub design pattern.",
   "main": "src/index.js",
   "scripts": {

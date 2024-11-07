@@ -11,8 +11,9 @@ export default defineConfig({
   build: {
     lib: {
       name: "MiniRdx",
-      fileName: "minirdx",
+      formats: ["es", "cjs", "umd"],
       entry: resolve(__dirname, "src/index.ts"),
+      fileName: (format) => `minirdx.${format}.js`,
     },
   },
 });

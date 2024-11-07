@@ -1,5 +1,5 @@
 {
-  "name": "minirdx",
+  "name": "@ludekarts/minirdx",
   "version": "0.3.0-alpha.0",
   "description": "State management library inspired by Redux anf PubSub pattern",
   "scripts": {
@@ -10,13 +10,14 @@
   "files": [
     "dist"
   ],
-  "main": "./dist/minirdx.umd.cjs",
-  "module": "./dist/minirdx.js",
+  "type": "module",
+  "main": "./dist/minirdx.umd.js",
+  "module": "./dist/minirdx.es.js",
   "types": "./dist/minirdx.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/minirdx.js",
-      "require": "./dist/minirdx.umd.cjs"
+      "import": "./dist/minirdx.es.js",
+      "require": "./dist/minirdx.umd.js"
     }
   },
   "keywords": [],

@@ -1,4 +1,4 @@
-import { createStore } from "../../src/minirdx.js";
+import { createStore } from "./minirdx.js";
 
 const display = document.getElementById("display");
 const incBtn = document.getElementById("incBtn");

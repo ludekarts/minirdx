@@ -1,6 +1,6 @@
 import "../../dist/minirdx.umd.js";
 
-const { createStore } = MiniRdx;
+const { createStore, selector } = MiniRdx;
 
 // New API Design:
 
@@ -8,6 +8,11 @@ const counterStore = createStore({
   state: {
     counter: 0,
     showLoader: false,
+    deep: {
+      nested: {
+        value: "🤯",
+      },
+    },
   },
 
   increment: (state, count) => {
@@ -31,8 +36,13 @@ const counterStore = createStore({
     return { ...state, counter: state.counter + amount };
   },
 
-  asyncDecrement: (state) =>
-    Promise.resolve({ ...state, counter: state.counter - 5 }),
+  asyncDecrement: (state) => {
+    return Promise.resolve({ ...state, counter: state.counter - 5 });
+  },
+
+  deepUpdate: selector("state.deep.nested.value", (value, emoji) => {
+    return value === "🤯" ? emoji : "🤯";
+  }),
 });
 
 // ---- Usage ------------------
@@ -56,6 +66,9 @@ buttons.addEventListener("click", async (event) => {
       await counterStore.asyncDecrement();
       console.log("Async dec end");
       return;
+    case "deepUpdate":
+      return counterStore.deepUpdate("🤩");
+      return;
     case "show":
       return console.log(counterStore.getState());
   }
@@ -74,9 +87,13 @@ const cancelDecSub = counterStore.on("decrement", (state) =>
   console.log("⬇️", state.counter)
 );
 
+const cancelDeepSub = counterStore.on("deepUpdate", (state) =>
+  console.log("DEEP", state.deep.nested.value)
+);
+
 const cancelIncTap = counterStore.tap(
   "increment",
-  "tapped",
+  "state.tapped",
   ({ state, slice }) => {
     console.log("Tapped:", slice);
     return state.counter > 3;

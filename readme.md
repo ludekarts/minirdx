@@ -1,3 +1,3 @@
 # MiniRdx
 
-State management library inspired by Redux anf PubSub pattern.
+State management library inspired by Redux and PubSub pattern.

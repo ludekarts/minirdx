@@ -3,7 +3,7 @@ type ScreateStoreConfig = {
   [key: string]: (...payload: any[]) => void;
 };
 
-const disalowKeys = ["on", "tap", "state", "getState"];
+const disallowKeys = ["on", "tap", "state", "getState"];
 
 type ActionListener = (state: any, actionName: string) => void;
 
@@ -75,7 +75,7 @@ export function createStore(config: ScreateStoreConfig) {
       };
     } else {
       throw new Error(
-        "MiniRdxError: Invalid arguments. Try state.on(action:string, listener: ActionListener)"
+        "MiniRdxError: Invalid arguments. Try state.on(action: string, listener: ActionListener)"
       );
     }
   }
@@ -138,12 +138,34 @@ export function createStore(config: ScreateStoreConfig) {
   });
 }
 
+const selectrorStore = new Map<string, ReductorFn>();
+
+type ReductorFn = (state: any, ...payload: any[]) => any;
+
+export function selector(selector: string, reductor: ReductorFn) {
+  if (selectrorStore.has(selector)) {
+    return selectrorStore.get(selector);
+  }
+
+  const { getter, setter } = createSelector(selector);
+  const selectorFn: ReductorFn = (state, ...payload) => {
+    setter(state, reductor(getter(state), ...payload));
+    return {
+      ...state,
+    };
+  };
+
+  selectrorStore.set(selector, selectorFn);
+
+  return selectorFn;
+}
+
 // ---- Helpers----------------
 
 function configToActions(config: ScreateStoreConfig, dispatch: Function) {
   return Object.keys(config).reduce((acc, key) => {
     if (typeof config[key] === "function") {
-      if (disalowKeys.includes(key)) {
+      if (disallowKeys.includes(key)) {
         throw new Error(`MiniRdxError:"${key}" is a reserved keyword`);
       }
       acc[key] = (...payload: any[]) =>
@@ -171,16 +193,16 @@ function createSelector(selector: string): SelectorObject {
         getter: (state: any) => state,
         setter: (_state: any, value: any) => value,
       };
-    } else if (/^[\w\[\]\d\.]+$/.test(selector)) {
+    } else if (/^state\.[\w\[\]\d\.]+$/.test(selector)) {
       return {
-        getter: new Function("state", `return state.${selector}`),
-        setter: new Function("state", "value", `state.${selector} = value`),
+        getter: new Function("state", `return ${selector}`),
+        setter: new Function("state", "value", `${selector} = value`),
       } as SelectorObject;
     }
   }
 
   throw new Error(
-    "MiniRDXError: Selector should be a string with dot notation e.g.: 'user.cars[1].name' "
+    `MiniRDXError: Selector should be a string with dot notation starting with "state." e.g.: "state.user.cars[1].name" `
   );
 }
 

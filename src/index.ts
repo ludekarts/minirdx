@@ -140,13 +140,19 @@ export function createStore(config: ScreateStoreConfig) {
 
 type ReductorFn = (state: any, ...payload: any[]) => any;
 
-export function selector(selector: string, reductor: ReductorFn): ReductorFn {
-  const { getter, setter } = createSelector(selector);
+export function selector(
+  selectorPath: string,
+  reductor: ReductorFn,
+  accessGlobalState = false
+): ReductorFn {
+  const { getter, setter } = createSelector(selectorPath);
 
   // Handle Async Reducers.
   if (isAsync(reductor)) {
     return async (state, ...payload) => {
-      const result = await reductor(getter(state), ...payload);
+      const result = await (accessGlobalState
+        ? reductor(state, getter(state), ...payload)
+        : reductor(getter(state), ...payload));
       setter(state, result);
       return {
         ...state,
@@ -157,12 +163,24 @@ export function selector(selector: string, reductor: ReductorFn): ReductorFn {
   // Handle Sync Reducers.
   else {
     return (state, ...payload) => {
-      setter(state, reductor(getter(state), ...payload));
+      setter(
+        state,
+        accessGlobalState
+          ? reductor(state, getter(state), ...payload)
+          : reductor(getter(state), ...payload)
+      );
       return {
         ...state,
       };
     };
   }
+}
+
+export function superSelector(
+  selectorPath: string,
+  reductor: ReductorFn
+): ReductorFn {
+  return selector(selectorPath, reductor, true);
 }
 
 // ---- Helpers----------------

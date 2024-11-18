@@ -46,9 +46,7 @@ const counterStore = createStore({
 
   deepUpdateAsync: selector("state.deep.nested.value", async (value, emoji) => {
     console.log("Waiting");
-
     await wait(1000);
-
     return value === "🤯" ? emoji : "🤯";
   }),
 });

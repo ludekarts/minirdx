@@ -115,37 +115,3 @@ function wait(time) {
     setTimeout(resolve, time);
   });
 }
-/*
-
-TO CONSIDER:
-
-counterStore.extend({
-  store: "emoji",
-  state: {
-    emoji: "😀",
-    some: {
-      deep: {
-        value: "🤯",
-      },
-    },
-  },
-
-  setEmoji: (state, payload) => {
-    return { ...state, emoji: payload };
-  },
-
-  setDeepEmoji: (state) => state,
-});
-
-counterStore.tap("setDeepEmoji", "emoji.some.deep.value", async () => {
-  const amount = await getRandomAmout();
-  return amount + "👾";
-});
-
-counterStore.subscribe("setEmoji", (state) =>
-  console.log("Emoji updated:", state)
-);
-
-counterStore.setEmoji("🎉");
-counterStore.setDeepEmoji();
-*/

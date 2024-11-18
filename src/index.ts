@@ -1,30 +1,41 @@
-type ScreateStoreConfig = {
-  state: any;
-  [key: string]: (...payload: any[]) => void;
+type StoreActions<State> = {
+  [key in Exclude<string, "state">]: (...payload: any[]) => State;
 };
+type StoreAction<State> = (...payload: any[]) => Promise<State>;
+type CreateStoreConfig<State> = { state: State } & StoreActions<State>;
+type ActionListener<State> = (state: State, actionName: string) => void;
+type ActionListenerColection<State> = Map<string, ActionListener<State>[]>;
+type PromiseResolve<T> = (value: T) => void;
+type Dispatcher<State> = (
+  actionName: string,
+  action: (state: State) => State,
+  resolve: PromiseResolve<State>
+) => void;
 
 const disallowKeys = ["on", "state", "getState"];
 
-type ActionListener = (state: any, actionName: string) => void;
+export function createStore<State>(config: CreateStoreConfig<State>) {
+  let state: State = config.state;
+  const globalListeners: ActionListener<State>[] = [];
+  const actionListeners: ActionListenerColection<State> = new Map();
 
-export function createStore(config: ScreateStoreConfig) {
-  let state = config.state;
-  const globalListeners: ActionListener[] = [];
-  const actionListeners = new Map<string, ActionListener[]>();
-
-  const actions = configToActions(config, dispatch);
-
-  function dispatch(actionName: string, action: Function, resolve: Function) {
+  const dispatch: Dispatcher<State> = (actionName, action, resolve) => {
     const newState = action(state);
 
-    isPromise(newState)
-      ? newState.then((resolvedState: any) =>
+    isPromise<State>(newState)
+      ? newState.then((resolvedState) =>
           updateState(resolvedState, actionName, resolve)
         )
       : updateState(newState, actionName, resolve);
-  }
+  };
 
-  function updateState(newState: any, actionName: string, resolve: Function) {
+  const actions = configToActions<State>(config, dispatch);
+
+  function updateState(
+    newState: State,
+    actionName: string,
+    resolve: PromiseResolve<State>
+  ) {
     state = newState;
 
     // Notify global listeners.
@@ -44,7 +55,10 @@ export function createStore(config: ScreateStoreConfig) {
     return state;
   }
 
-  function on(action: string | ActionListener, listener: ActionListener) {
+  function on(
+    action: string | ActionListener<State>,
+    listener: ActionListener<State>
+  ) {
     // Subscribe to global actions.
     if (typeof action === "function" && listener === undefined) {
       globalListeners.push(action);
@@ -124,7 +138,10 @@ export function superSelector(
 
 // ---- Helpers----------------
 
-function configToActions(config: ScreateStoreConfig, dispatch: Function) {
+function configToActions<State>(
+  config: CreateStoreConfig<State>,
+  dispatch: Dispatcher<State>
+) {
   return Object.keys(config).reduce((acc, key) => {
     if (typeof config[key] === "function") {
       if (disallowKeys.includes(key)) {
@@ -134,13 +151,13 @@ function configToActions(config: ScreateStoreConfig, dispatch: Function) {
         new Promise((resolve) => {
           dispatch(
             key,
-            (state: any) => config[key](state, ...payload),
+            (state: State) => config[key](state, ...payload),
             resolve
           );
         });
     }
     return acc;
-  }, {} as Record<string, () => void>);
+  }, {} as Record<string, StoreAction<State>>);
 }
 
 type SelectorObject = {
@@ -168,11 +185,11 @@ function createSelector(selector: string): SelectorObject {
   );
 }
 
-function isPromise(o: any) {
+function isPromise<T>(value: any): value is Promise<T> {
   return (
-    !!o &&
-    (typeof o === "object" || typeof o === "function") &&
-    typeof o.then === "function"
+    !!value &&
+    (typeof value === "object" || typeof value === "function") &&
+    typeof value.then === "function"
   );
 }
 

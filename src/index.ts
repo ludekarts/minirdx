@@ -75,7 +75,7 @@ export function createStore(config: ScreateStoreConfig) {
       };
     } else {
       throw new Error(
-        "MiniRdxError: Invalid arguments. Try state.on(action: string, listener: ActionListener)"
+        "MiniRdxError: Invalid arguments. Try: state.on(action: string, listener: ActionListener)"
       );
     }
   }
@@ -138,26 +138,31 @@ export function createStore(config: ScreateStoreConfig) {
   });
 }
 
-const selectrorStore = new Map<string, ReductorFn>();
-
 type ReductorFn = (state: any, ...payload: any[]) => any;
 
-export function selector(selector: string, reductor: ReductorFn) {
-  if (selectrorStore.has(selector)) {
-    return selectrorStore.get(selector);
+export function selector(selector: string, reductor: ReductorFn): ReductorFn {
+  const { getter, setter } = createSelector(selector);
+
+  // Handle Async Reducers.
+  if (isAsync(reductor)) {
+    return async (state, ...payload) => {
+      const result = await reductor(getter(state), ...payload);
+      setter(state, result);
+      return {
+        ...state,
+      };
+    };
   }
 
-  const { getter, setter } = createSelector(selector);
-  const selectorFn: ReductorFn = (state, ...payload) => {
-    setter(state, reductor(getter(state), ...payload));
-    return {
-      ...state,
+  // Handle Sync Reducers.
+  else {
+    return (state, ...payload) => {
+      setter(state, reductor(getter(state), ...payload));
+      return {
+        ...state,
+      };
     };
-  };
-
-  selectrorStore.set(selector, selectorFn);
-
-  return selectorFn;
+  }
 }
 
 // ---- Helpers----------------
@@ -212,4 +217,8 @@ function isPromise(o: any) {
     (typeof o === "object" || typeof o === "function") &&
     typeof o.then === "function"
   );
+}
+
+function isAsync(fn: Function) {
+  return fn.constructor.name === "AsyncFunction";
 }

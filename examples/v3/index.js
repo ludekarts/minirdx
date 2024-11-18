@@ -43,6 +43,14 @@ const counterStore = createStore({
   deepUpdate: selector("state.deep.nested.value", (value, emoji) => {
     return value === "🤯" ? emoji : "🤯";
   }),
+
+  deepUpdateAsync: selector("state.deep.nested.value", async (value, emoji) => {
+    console.log("Waiting");
+
+    await wait(1000);
+
+    return value === "🤯" ? emoji : "🤯";
+  }),
 });
 
 // ---- Usage ------------------
@@ -68,7 +76,12 @@ buttons.addEventListener("click", async (event) => {
       return;
     case "deepUpdate":
       return counterStore.deepUpdate("🤩");
+    case "deepUpdateAsync":
+      console.log("Async Deep start");
+      await counterStore.deepUpdateAsync("💥");
+      console.log("Async Deep end");
       return;
+
     case "show":
       return console.log(counterStore.getState());
   }
@@ -108,6 +121,11 @@ function getRandomAmout() {
   });
 }
 
+function wait(time) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, time);
+  });
+}
 /*
 
 TO CONSIDER:

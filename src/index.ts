@@ -3,20 +3,13 @@ type ScreateStoreConfig = {
   [key: string]: (...payload: any[]) => void;
 };
 
-const disallowKeys = ["on", "tap", "state", "getState"];
+const disallowKeys = ["on", "state", "getState"];
 
 type ActionListener = (state: any, actionName: string) => void;
-
-interface TapListener {
-  (props: { state: any; slice: any }): void;
-  getter(state: any): any;
-  setter(state: any, value: any): any;
-}
 
 export function createStore(config: ScreateStoreConfig) {
   let state = config.state;
   const globalListeners: ActionListener[] = [];
-  const tapListeners = new Map<string, TapListener[]>();
   const actionListeners = new Map<string, ActionListener[]>();
 
   const actions = configToActions(config, dispatch);
@@ -33,9 +26,6 @@ export function createStore(config: ScreateStoreConfig) {
 
   function updateState(newState: any, actionName: string, resolve: Function) {
     state = newState;
-
-    // Run tap listeners.
-    state = applyTaps(state, actionName);
 
     // Notify global listeners.
     globalListeners.length &&
@@ -80,60 +70,9 @@ export function createStore(config: ScreateStoreConfig) {
     }
   }
 
-  function tap(
-    action: string,
-    selector: string | TapListener,
-    listener?: TapListener
-  ) {
-    if (typeof action !== "string") {
-      throw new Error("MiniRdxError: Action name is required");
-    }
-
-    if (!tapListeners.has(action)) {
-      tapListeners.set(action, []);
-    }
-
-    const NO_SELECTOR =
-      typeof selector === "function" && listener === undefined;
-
-    const { getter, setter } = createSelector(
-      NO_SELECTOR ? "" : (selector as string)
-    );
-
-    const tapListener = NO_SELECTOR
-      ? (selector as TapListener)
-      : (listener as TapListener);
-
-    tapListener.getter = getter;
-    tapListener.setter = setter;
-
-    tapListeners.get(action)?.push(tapListener);
-
-    return () => {
-      tapListeners
-        .get(action)
-        ?.splice(tapListeners.get(action)?.indexOf(tapListener) as number, 1);
-    };
-  }
-
-  function applyTaps(state: any, actionName: string) {
-    const taps = tapListeners.get(actionName);
-
-    if (!taps) {
-      return state;
-    } else {
-      return taps.reduce((acc, tap) => {
-        const slice = tap.getter(acc);
-        tap.setter(acc, tap({ state: acc, slice }));
-        return acc;
-      }, state);
-    }
-  }
-
   return Object.freeze({
     ...actions,
     getState,
-    tap,
     on,
   });
 }

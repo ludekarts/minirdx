@@ -102,15 +102,6 @@ const cancelDeepSub = counterStore.on("deepUpdate", (state) =>
   console.log("DEEP", state.deep.nested.value)
 );
 
-const cancelIncTap = counterStore.tap(
-  "increment",
-  "state.tapped",
-  ({ state, slice }) => {
-    console.log("Tapped:", slice);
-    return state.counter > 3;
-  }
-);
-
 function getRandomAmout() {
   return new Promise((resolve) => {
     setTimeout(() => {

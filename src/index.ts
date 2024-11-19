@@ -1,35 +1,49 @@
-type StoreActions<State> = {
-  [key in Exclude<string, "state">]: (...payload: any[]) => State;
+// Actions defined during store initalization.
+type StoreAction<State> = (state: State, ...payload: any[]) => State;
+
+// Store initalization object.
+type StoreConfig<State> = {
+  state: State;
+  [key: string]: StoreAction<State> | State;
 };
-type StoreAction<State> = (...payload: any[]) => Promise<State>;
-type CreateStoreConfig<State> = { state: State } & StoreActions<State>;
+
+// Action listener callback decelared with "store.on()"" method.
 type ActionListener<State> = (state: State, actionName: string) => void;
+
+// Internal list of all action listeners.
 type ActionListenerColection<State> = Map<string, ActionListener<State>[]>;
+
+// Generic Promise resolve callback.
 type PromiseResolve<T> = (value: T) => void;
-type Dispatcher<State> = (
+
+// Resolves sync & async store actions.
+type Resolver<State> = (
   actionName: string,
-  action: (state: State) => State,
+  action: StoreAction<State>,
   resolve: PromiseResolve<State>
 ) => void;
 
 const disallowKeys = ["on", "state", "getState"];
 
-export function createStore<State>(config: CreateStoreConfig<State>) {
-  let state: State = config.state;
+export function createStore<State>(config: StoreConfig<State>) {
+  let state = config.state;
+
   const globalListeners: ActionListener<State>[] = [];
   const actionListeners: ActionListenerColection<State> = new Map();
 
-  const dispatch: Dispatcher<State> = (actionName, action, resolve) => {
-    const newState = action(state);
+  const actions = configToActions<State>(
+    config,
+    (actionName, action, resolve) => {
+      const newState = action(state);
+      isPromise<State>(newState)
+        ? newState.then((resolvedState) =>
+            updateState(resolvedState, actionName, resolve)
+          )
+        : updateState(newState, actionName, resolve);
+    }
+  );
 
-    isPromise<State>(newState)
-      ? newState.then((resolvedState) =>
-          updateState(resolvedState, actionName, resolve)
-        )
-      : updateState(newState, actionName, resolve);
-  };
-
-  const actions = configToActions<State>(config, dispatch);
+  type ActionsKeys = keyof typeof actions;
 
   function updateState(
     newState: State,
@@ -51,13 +65,15 @@ export function createStore<State>(config: CreateStoreConfig<State>) {
     resolve(state);
   }
 
-  function getState() {
-    return state;
+  function getState<T = State>(selector?: (state: State) => T): T {
+    return typeof selector === "function"
+      ? selector(state)
+      : (state as unknown as T);
   }
 
   function on(
     action: string | ActionListener<State>,
-    listener: ActionListener<State>
+    listener?: ActionListener<State>
   ) {
     // Subscribe to global actions.
     if (typeof action === "function" && listener === undefined) {
@@ -84,11 +100,13 @@ export function createStore<State>(config: CreateStoreConfig<State>) {
     }
   }
 
-  return Object.freeze({
+  const api = Object.freeze({
     ...actions,
     getState,
     on,
   });
+
+  return api;
 }
 
 type ReductorFn = (state: any, ...payload: any[]) => any;
@@ -139,25 +157,29 @@ export function superSelector(
 // ---- Helpers----------------
 
 function configToActions<State>(
-  config: CreateStoreConfig<State>,
-  dispatch: Dispatcher<State>
+  config: StoreConfig<State>,
+  dispatch: Resolver<State>
 ) {
+  type Actions = keyof typeof config;
+
   return Object.keys(config).reduce((acc, key) => {
     if (typeof config[key] === "function") {
       if (disallowKeys.includes(key)) {
         throw new Error(`MiniRdxError:"${key}" is a reserved keyword`);
       }
-      acc[key] = (...payload: any[]) =>
+
+      acc[key as Actions] = (...payload: any[]) =>
         new Promise((resolve) => {
           dispatch(
             key,
-            (state: State) => config[key](state, ...payload),
+            (state: State) =>
+              (config[key] as StoreAction<State>)(state, ...payload),
             resolve
           );
         });
     }
     return acc;
-  }, {} as Record<string, StoreAction<State>>);
+  }, {} as Record<Actions, (...payload: any[]) => Promise<State>>);
 }
 
 type SelectorObject = {

@@ -1,4 +1,4 @@
-import "../../dist/minirdx.umd.js";
+import "../dist/minirdx.umd.js";
 
 const { createStore, selector } = MiniRdx;
 

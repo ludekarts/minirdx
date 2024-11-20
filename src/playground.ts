@@ -1,31 +1,32 @@
-function createStore<
-  S,
-  A extends { [key: string]: (state: S, ...args: any[]) => S }
->(config: { state: S } & A) {
-  let { state, ...actions } = config;
+type ActionStore<S> = { [key: string]: (state: S, ...args: any[]) => S };
+type OmitFirstParam<T extends (...args: any[]) => any> = T extends (
+  state: any,
+  ...args: infer P
+) => any
+  ? P
+  : never;
 
+function createStore<S, A extends ActionStore<S>>(config: { state: S } & A) {
+  let { state, ...actions } = config;
   type Actions = typeof actions;
 
-  // Utility type to exclude the first parameter
-  type ExcludeFirstParameter<T extends (...args: any) => any> = T extends (
-    state: any,
-    ...args: infer P
-  ) => any
-    ? P
-    : never;
-
-  const ac = Object.entries(actions).reduce((acc, [key, action]) => {
-    acc[key as keyof Actions] = (
-      ...args: ExcludeFirstParameter<typeof action>
-    ) => (action as Function)(state, ...args);
+  const apiActions = Object.entries(actions).reduce((acc, [key, action]) => {
+    acc[key as keyof Actions] = (...args: OmitFirstParam<typeof action>) =>
+      (action as Function)(state, ...args);
     return acc;
-  }, {} as { [K in keyof Actions]: (...args: ExcludeFirstParameter<Actions[K]>) => State });
+  }, {} as { [K in keyof Actions]: (...args: OmitFirstParam<Actions[K]>) => State });
 
   return {
     getState() {
       return state;
     },
-    ...ac,
+
+    on(
+      action: keyof Actions,
+      callback: (state: S, action: keyof Actions) => void
+    ) {},
+
+    ...apiActions,
   };
 }
 
@@ -73,3 +74,7 @@ store.decrement(2);
 store.getState().text;
 
 store.hello("Hello, World!");
+
+store.on("hello", (state, action) => {
+  console.log(`Hello action: "${action}" was called with text: ${state.text}`);
+});

@@ -1,5 +1,10 @@
-// Basic store action.
-type ActionStore<S> = { [key: string]: (state: S, ...args: any[]) => S };
+// MiniRDX - Minimalistic Redux-like state management library.
+
+// Basic action.
+type Action<S> = (state: S, ...args: any[]) => S | Promise<S>;
+
+// Colection of actions.
+type ActionStore<S> = { [key: string]: Action<S> };
 
 // Action listener callback decelared with "store.on()"" method.
 type ActionListener<S, A> = (state: S, actionName: keyof A) => void;
@@ -18,19 +23,17 @@ type OmitFirstParam<T extends (...args: any[]) => any> = T extends (
   ? P
   : never;
 
-const disallowKeys = ["on", "state", "getState"];
+const protectedKeys = ["on", "state", "getState"];
 
 function createStore<S, A extends ActionStore<S>>(config: { state: S } & A) {
   let { state, ...actions } = config;
-
-  type Action = (state: S, ...args: any[]) => S;
   type Actions = typeof actions;
 
   const globalListeners: ActionListener<S, A>[] = [];
   const actionListeners: ActionListenerColection<S, A> = new Map();
 
   const apiActions = Object.entries(actions).reduce((acc, [key, action]) => {
-    if (disallowKeys.includes(key)) {
+    if (protectedKeys.includes(key)) {
       throw new Error(`MiniRdxError: "${key}" is a reserved keyword`);
     }
     acc[key as keyof Actions] = (...args: OmitFirstParam<typeof action>) => {
@@ -41,11 +44,11 @@ function createStore<S, A extends ActionStore<S>>(config: { state: S } & A) {
     };
 
     return acc;
-  }, {} as { [K in keyof Actions]: (...args: OmitFirstParam<Actions[K]>) => Promise<S> });
+  }, {} as { [K in keyof Actions]: (...args: OmitFirstParam<Actions[K]>) => S | Promise<S> });
 
   function resolver(
     actionName: string,
-    action: Action,
+    action: Action<S>,
     resolve: PromiseResolve<S>
   ) {
     const newState = action(state);
@@ -119,7 +122,77 @@ function createStore<S, A extends ActionStore<S>>(config: { state: S } & A) {
   };
 }
 
-// ---- Helpers ----------------
+// ---- Selectors ----------------
+
+export function selector<S>(
+  selectorPath: string,
+  action: Action<S>,
+  accessGlobalState = false
+): Action<S> {
+  const { getter, setter } = createSelector(selectorPath);
+
+  // Handle Async Reducers.
+  if (isAsync(action)) {
+    return async function (state: S, ...payload: any[]) {
+      const result = await (accessGlobalState
+        ? action(state, getter(state), ...payload)
+        : action(getter(state), ...payload));
+      setter(state, result);
+      return {
+        ...state,
+      };
+    };
+  }
+
+  // Handle Sync Reducers.
+  else {
+    return (state, ...payload) => {
+      setter(
+        state,
+        accessGlobalState
+          ? action(state, getter(state), ...payload)
+          : action(getter(state), ...payload)
+      );
+      return {
+        ...state,
+      };
+    };
+  }
+}
+
+export function superSelector<S>(
+  selectorPath: string,
+  action: Action<S>
+): Action<S> | Promise<Action<S>> {
+  return selector(selectorPath, action, true);
+}
+
+type SelectorObject<S> = {
+  getter: (state: S) => any;
+  setter: (_state: S, value: any) => any;
+};
+
+function createSelector<S>(selector: string): SelectorObject<S> {
+  if (typeof selector === "string") {
+    if (selector === "") {
+      return {
+        getter: (state: S) => state,
+        setter: (_state: S, value: unknown) => value,
+      };
+    } else if (/^state\.[\w\[\]\d\.]+$/.test(selector)) {
+      return {
+        getter: new Function("state", `return ${selector}`),
+        setter: new Function("state", "value", `${selector} = value`),
+      } as SelectorObject<S>;
+    }
+  }
+
+  throw new Error(
+    `MiniRDXError: Selector should be a string with dot notation starting with "state." e.g.: "state.user.cars[1].model" `
+  );
+}
+
+// ---- Helpers ------------------
 
 function isPromise<T>(value: any): value is Promise<T> {
   return (

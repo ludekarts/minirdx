@@ -1,11 +1,10 @@
 // Actions defined during store initalization.
-type StoreAction<State> = (state: State, ...payload: any[]) => State;
+type StoreAction<State, Payload extends any[] = []> = (
+  state: State,
+  ...payload: Payload
+) => State;
 
-// Store initalization object.
-type StoreConfig<State> = {
-  state: State;
-  [key: string]: StoreAction<State> | State;
-};
+type ActionCollection<State> = Record<string, StoreAction<State>>;
 
 // Action listener callback decelared with "store.on()"" method.
 type ActionListener<State> = (state: State, actionName: string) => void;
@@ -25,14 +24,16 @@ type Resolver<State> = (
 
 const disallowKeys = ["on", "state", "getState"];
 
-export function createStore<State>(config: StoreConfig<State>) {
-  let state = config.state;
+export function createStore<State, Actions extends ActionCollection<State>>(
+  config: { state: State } & Actions
+) {
+  let { state, ...storeActions } = config;
 
   const globalListeners: ActionListener<State>[] = [];
   const actionListeners: ActionListenerColection<State> = new Map();
 
   const actions = configToActions<State>(
-    config,
+    storeActions,
     (actionName, action, resolve) => {
       const newState = action(state);
       isPromise<State>(newState)
@@ -42,8 +43,6 @@ export function createStore<State>(config: StoreConfig<State>) {
         : updateState(newState, actionName, resolve);
     }
   );
-
-  type ActionsKeys = keyof typeof actions;
 
   function updateState(
     newState: State,
@@ -72,7 +71,7 @@ export function createStore<State>(config: StoreConfig<State>) {
   }
 
   function on(
-    action: string | ActionListener<State>,
+    action: keyof Actions | ActionListener<State>,
     listener?: ActionListener<State>
   ) {
     // Subscribe to global actions.
@@ -100,13 +99,21 @@ export function createStore<State>(config: StoreConfig<State>) {
     }
   }
 
-  const api = Object.freeze({
-    ...actions,
-    getState,
-    on,
-  });
+  type StateAPI = {
+    getState<T = State>(selector?: (state: State) => T): T;
+    on: (
+      action: keyof Actions | ActionListener<State>,
+      listener?: ActionListener<State>
+    ) => void;
+  };
 
-  return api;
+  type ActionsAPI = {
+    [K in keyof Actions]: ExternalAction<State>;
+  };
+
+  return Object.freeze(
+    mergeObjects<StateAPI, ActionsAPI>({ getState, on }, actions as ActionsAPI)
+  );
 }
 
 type ReductorFn = (state: any, ...payload: any[]) => any;
@@ -156,30 +163,42 @@ export function superSelector(
 
 // ---- Helpers----------------
 
+type ExternalAction<State, Payload extends any[] = []> = (
+  ...payload: Payload
+) => Promise<State>;
+
 function configToActions<State>(
-  config: StoreConfig<State>,
+  serverActions: ActionCollection<State>,
   dispatch: Resolver<State>
 ) {
-  type Actions = keyof typeof config;
-
-  return Object.keys(config).reduce((acc, key) => {
-    if (typeof config[key] === "function") {
+  return Object.keys(serverActions).reduce((acc, key) => {
+    if (
+      typeof serverActions[key as keyof ActionCollection<State>] === "function"
+    ) {
       if (disallowKeys.includes(key)) {
         throw new Error(`MiniRdxError:"${key}" is a reserved keyword`);
       }
 
-      acc[key as Actions] = (...payload: any[]) =>
+      acc[key] = (...payload) =>
         new Promise((resolve) => {
           dispatch(
             key,
             (state: State) =>
-              (config[key] as StoreAction<State>)(state, ...payload),
+              (
+                serverActions[
+                  key as keyof ActionCollection<State>
+                ] as StoreAction<State>
+              )(state, ...payload),
             resolve
           );
         });
     }
     return acc;
-  }, {} as Record<Actions, (...payload: any[]) => Promise<State>>);
+  }, {} as Record<keyof ActionCollection<State>, ExternalAction<State>>);
+}
+
+function mergeObjects<T, U>(obj1: T, obj2: U): T & U {
+  return { ...obj1, ...obj2 };
 }
 
 type SelectorObject = {

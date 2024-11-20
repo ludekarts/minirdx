@@ -1,53 +1,70 @@
-// Actions defined during store initalization.
-type StoreAction<State, Payload extends any[] = []> = (
-  state: State,
-  ...payload: Payload
-) => State;
+// MiniRDX by Wojciech Ludwin, @ludekarts
 
-type ActionCollection<State> = Record<string, StoreAction<State>>;
+// Basic action.
+type Action<S> = (state: S, ...args: any[]) => S | Promise<S>;
+
+// Colection of actions.
+type ActionStore<S> = { [key: string]: Action<S> };
 
 // Action listener callback decelared with "store.on()"" method.
-type ActionListener<State> = (state: State, actionName: string) => void;
+type ActionListener<S, A> = (state: S, actionName: keyof A) => void;
 
 // Internal list of all action listeners.
-type ActionListenerColection<State> = Map<string, ActionListener<State>[]>;
+type ActionListenerColection<S, A> = Map<string, ActionListener<S, A>[]>;
 
 // Generic Promise resolve callback.
 type PromiseResolve<T> = (value: T) => void;
 
-// Resolves sync & async store actions.
-type Resolver<State> = (
-  actionName: string,
-  action: StoreAction<State>,
-  resolve: PromiseResolve<State>
-) => void;
+// Allow to skip the first parameter of a function.
+type OmitFirstParam<T extends (...args: any[]) => any> = T extends (
+  state: any,
+  ...args: infer P
+) => any
+  ? P
+  : never;
 
-const disallowKeys = ["on", "state", "getState"];
+const protectedKeys = ["on", "state", "getState"];
 
-export function createStore<State, Actions extends ActionCollection<State>>(
-  config: { state: State } & Actions
+export function createStore<S, A extends ActionStore<S>>(
+  config: { state: S } & A
 ) {
-  let { state, ...storeActions } = config;
+  let { state, ...actions } = config;
+  type Actions = typeof actions;
 
-  const globalListeners: ActionListener<State>[] = [];
-  const actionListeners: ActionListenerColection<State> = new Map();
+  const globalListeners: ActionListener<S, A>[] = [];
+  const actionListeners: ActionListenerColection<S, A> = new Map();
 
-  const actions = configToActions<State>(
-    storeActions,
-    (actionName, action, resolve) => {
-      const newState = action(state);
-      isPromise<State>(newState)
-        ? newState.then((resolvedState) =>
-            updateState(resolvedState, actionName, resolve)
-          )
-        : updateState(newState, actionName, resolve);
+  const apiActions = Object.entries(actions).reduce((acc, [key, action]) => {
+    if (protectedKeys.includes(key)) {
+      throw new Error(`MiniRdxError: "${key}" is a reserved keyword`);
     }
-  );
+    acc[key as keyof Actions] = (...args: OmitFirstParam<typeof action>) => {
+      return new Promise((resolve) => {
+        const action = (state: S) => (action as Function)(state, ...args);
+        resolver(key, action, resolve);
+      });
+    };
+
+    return acc;
+  }, {} as { [K in keyof Actions]: (...args: OmitFirstParam<Actions[K]>) => S | Promise<S> });
+
+  function resolver(
+    actionName: string,
+    action: Action<S>,
+    resolve: PromiseResolve<S>
+  ) {
+    const newState = action(state);
+    isPromise<S>(newState)
+      ? newState.then((resolvedState: S) =>
+          updateState(resolvedState, actionName, resolve)
+        )
+      : updateState(newState, actionName, resolve);
+  }
 
   function updateState(
-    newState: State,
+    newState: S,
     actionName: string,
-    resolve: PromiseResolve<State>
+    resolve: PromiseResolve<S>
   ) {
     state = newState;
 
@@ -64,74 +81,70 @@ export function createStore<State, Actions extends ActionCollection<State>>(
     resolve(state);
   }
 
-  function getState<T = State>(selector?: (state: State) => T): T {
-    return typeof selector === "function"
-      ? selector(state)
-      : (state as unknown as T);
-  }
+  return {
+    getState<T = S>(selector?: (state: S) => T): T {
+      return typeof selector === "function"
+        ? selector(state)
+        : (state as unknown as T);
+    },
 
-  function on(
-    action: keyof Actions | ActionListener<State>,
-    listener?: ActionListener<State>
-  ) {
-    // Subscribe to global actions.
-    if (typeof action === "function" && listener === undefined) {
-      globalListeners.push(action);
-      return () => globalListeners.splice(globalListeners.indexOf(action), 1);
-    }
-
-    // Subscribe to specific actions.
-    else if (typeof action === "string" && listener) {
-      if (!actionListeners.has(action)) {
-        actionListeners.set(action, []);
+    on(
+      action: keyof Actions | ActionListener<S, A>,
+      listener?: ActionListener<S, A>
+    ) {
+      // Subscribe to global actions.
+      if (typeof action === "function" && listener === undefined) {
+        globalListeners.push(action);
+        return () => globalListeners.splice(globalListeners.indexOf(action), 1);
       }
 
-      actionListeners.get(action)?.push(listener);
-      return () => {
-        actionListeners
-          .get(action)
-          ?.splice(actionListeners.get(action)?.indexOf(listener) as number, 1);
-      };
-    } else {
-      throw new Error(
-        "MiniRdxError: Invalid arguments. Try: state.on(action: string, listener: ActionListener)"
-      );
-    }
-  }
+      // Subscribe to specific actions.
+      else if (typeof action === "string" && listener) {
+        if (!actionListeners.has(action)) {
+          actionListeners.set(action, []);
+        }
 
-  type StateAPI = {
-    getState<T = State>(selector?: (state: State) => T): T;
-    on: (
-      action: keyof Actions | ActionListener<State>,
-      listener?: ActionListener<State>
-    ) => void;
+        actionListeners.get(action)?.push(listener);
+        return () => {
+          actionListeners
+            .get(action)
+            ?.splice(
+              actionListeners.get(action)?.indexOf(listener) as number,
+              1
+            );
+        };
+      } else {
+        throw new Error(
+          "MiniRdxError: Invalid arguments. Try: state.on(action: string, listener: ActionListener)"
+        );
+      }
+    },
+
+    ...apiActions,
   };
-
-  type ActionsAPI = {
-    [K in keyof Actions]: ExternalAction<State>;
-  };
-
-  return Object.freeze(
-    mergeObjects<StateAPI, ActionsAPI>({ getState, on }, actions as ActionsAPI)
-  );
 }
 
-type ReductorFn = (state: any, ...payload: any[]) => any;
+// ---- Selectors ----------------
 
-export function selector(
+type SelectorAction<T> = (slice: T, ...payload: any[]) => T | Promise<T>;
+
+export function selector<S>(
   selectorPath: string,
-  reductor: ReductorFn,
+  action: Action<S>,
   accessGlobalState = false
-): ReductorFn {
-  const { getter, setter } = createSelector(selectorPath);
+): Action<S> {
+  const { getter, setter } = createSelector<S>(selectorPath);
 
   // Handle Async Reducers.
-  if (isAsync(reductor)) {
-    return async (state, ...payload) => {
-      const result = await (accessGlobalState
-        ? reductor(state, getter(state), ...payload)
-        : reductor(getter(state), ...payload));
-      setter(state, result);
+  if (isAsync(action)) {
+    return async function (state, ...payload) {
+      if (accessGlobalState) {
+        const result = await action(state, getter(state), ...payload);
+        setter(state, result);
+      } else {
+        const result = action(getter(state), ...payload);
+        setter(state, result);
+      }
       return {
         ...state,
       };
@@ -141,12 +154,11 @@ export function selector(
   // Handle Sync Reducers.
   else {
     return (state, ...payload) => {
-      setter(
-        state,
-        accessGlobalState
-          ? reductor(state, getter(state), ...payload)
-          : reductor(getter(state), ...payload)
-      );
+      if (accessGlobalState) {
+        setter(state, action(state, getter(state), ...payload));
+      } else {
+        setter(state, action(getter(state), ...payload));
+      }
       return {
         ...state,
       };
@@ -154,77 +166,39 @@ export function selector(
   }
 }
 
-export function superSelector(
+export function superSelector<S>(
   selectorPath: string,
-  reductor: ReductorFn
-): ReductorFn {
-  return selector(selectorPath, reductor, true);
+  action: Action<S>
+): Action<S> | Promise<Action<S>> {
+  return selector(selectorPath, action, true);
 }
 
-// ---- Helpers----------------
-
-type ExternalAction<State, Payload extends any[] = []> = (
-  ...payload: Payload
-) => Promise<State>;
-
-function configToActions<State>(
-  serverActions: ActionCollection<State>,
-  dispatch: Resolver<State>
-) {
-  return Object.keys(serverActions).reduce((acc, key) => {
-    if (
-      typeof serverActions[key as keyof ActionCollection<State>] === "function"
-    ) {
-      if (disallowKeys.includes(key)) {
-        throw new Error(`MiniRdxError:"${key}" is a reserved keyword`);
-      }
-
-      acc[key] = (...payload) =>
-        new Promise((resolve) => {
-          dispatch(
-            key,
-            (state: State) =>
-              (
-                serverActions[
-                  key as keyof ActionCollection<State>
-                ] as StoreAction<State>
-              )(state, ...payload),
-            resolve
-          );
-        });
-    }
-    return acc;
-  }, {} as Record<keyof ActionCollection<State>, ExternalAction<State>>);
-}
-
-function mergeObjects<T, U>(obj1: T, obj2: U): T & U {
-  return { ...obj1, ...obj2 };
-}
-
-type SelectorObject = {
-  getter: (state: any) => any;
-  setter: (_state: any, value: any) => any;
+type SelectorObject<S> = {
+  getter: (state: S) => any;
+  setter: (_state: S, value: any) => any;
 };
 
-function createSelector(selector: string): SelectorObject {
+function createSelector<S>(selector: string): SelectorObject<S> {
   if (typeof selector === "string") {
     if (selector === "") {
       return {
-        getter: (state: any) => state,
-        setter: (_state: any, value: any) => value,
+        getter: (state: S) => state,
+        setter: (_state: S, value: unknown) => value,
       };
     } else if (/^state\.[\w\[\]\d\.]+$/.test(selector)) {
       return {
         getter: new Function("state", `return ${selector}`),
         setter: new Function("state", "value", `${selector} = value`),
-      } as SelectorObject;
+      } as SelectorObject<S>;
     }
   }
 
   throw new Error(
-    `MiniRDXError: Selector should be a string with dot notation starting with "state." e.g.: "state.user.cars[1].name" `
+    `MiniRDXError: Selector should be a string with dot notation starting with "state." e.g.: "state.user.cars[1].model" `
   );
 }
+
+// ---- Helpers ------------------
 
 function isPromise<T>(value: any): value is Promise<T> {
   return (
@@ -237,3 +211,60 @@ function isPromise<T>(value: any): value is Promise<T> {
 function isAsync(fn: Function) {
   return fn.constructor.name === "AsyncFunction";
 }
+
+// ---- Example ------------------
+
+interface State {
+  count: number;
+  text: string;
+  deep: {
+    nested: {
+      value: number;
+    };
+  };
+}
+
+type Actions = {
+  hello: (s: State, text: string) => State;
+  increment: (s: State, amount: number) => State;
+  // decrement: (s: State, amount: number) => State;
+};
+
+const store = createStore<State, Actions>({
+  state: {
+    count: 0,
+    text: "",
+    deep: {
+      nested: {
+        value: 0,
+      },
+    },
+  },
+
+  hello(state, text) {
+    return { ...state, text };
+  },
+
+  increment(state, amount) {
+    return {
+      ...state,
+      count: state.count + amount,
+    };
+  },
+
+  // decrement: selector<State, number>("state.count", (count, amount) => count - 1),
+});
+
+store.getState().count;
+store.getState((s) => s.text);
+// store.decrement(3);
+// store.decrement(2);
+store.hello("Hello, World!");
+
+store.getState().text;
+
+store.hello("Hello, World!");
+
+store.on("hello", (state, action) => {
+  console.log(`Hello action: "${action}" was called with text: ${state.text}`);
+});

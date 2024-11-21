@@ -166,6 +166,12 @@ export function selector<S>(
   }
 }
 
+function selectorX<S>(): Action<S> {
+  return (state, ...args) => {
+    return state;
+  };
+}
+
 export function superSelector<S>(
   selectorPath: string,
   action: Action<S>
@@ -227,7 +233,7 @@ interface State {
 type Actions = {
   hello: (s: State, text: string) => State;
   increment: (s: State, amount: number) => State;
-  // decrement: (s: State, amount: number) => State;
+  decrement: (s: State, amount: number) => State;
 };
 
 const store = createStore<State, Actions>({
@@ -252,7 +258,8 @@ const store = createStore<State, Actions>({
     };
   },
 
-  // decrement: selector<State, number>("state.count", (count, amount) => count - 1),
+  // decrement: selectorX<State>("state.count", (count, amount) => count - 1),
+  decrement: selectorX<State>(),
 });
 
 store.getState().count;

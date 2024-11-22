@@ -145,7 +145,7 @@ type SelectorReturnType<A extends (...args: any[]) => any> = (
 
 export function selector<A extends (...args: any[]) => any, S>(
   selectorPath: string,
-  action: (state: S, ...args: Parameters<A>) => S,
+  action: (state: S, ...args: Parameters<A>) => S | Promise<S>,
   accessGlobalState = false
 ): SelectorReturnType<A> {
   const { getter, setter } = createSelector<S>(selectorPath);

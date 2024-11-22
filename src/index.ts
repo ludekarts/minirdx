@@ -138,21 +138,21 @@ export function createStore<S, A extends ActionStore<S>>(
 
 // ---- Selectors ----------------
 
-type SelectorAction<T> = (slice: T, ...args: any[]) => T | Promise<T>;
+type SelectorReturnType<A extends (...args: any[]) => any> = (
+  state: ReturnType<A>,
+  ...args: Parameters<A>
+) => ReturnType<A> extends Promise<infer R> ? Promise<R> : ReturnType<A>;
 
-export function selector<S, T>(
+export function selector<A extends (...args: any[]) => any, S>(
   selectorPath: string,
-  action: SelectorAction<T>,
+  action: (state: S, ...args: Parameters<A>) => S,
   accessGlobalState = false
-): (state: S, ...args: any[]) => S | Promise<S> {
-  const { getter, setter } = createSelector<S, T>(selectorPath);
+): SelectorReturnType<A> {
+  const { getter, setter } = createSelector<S>(selectorPath);
 
   // Handle Async Reducers.
   if (isAsync(action)) {
-    return async function (
-      state: S,
-      ...args: Parameters<typeof action>
-    ): Promise<S> {
+    return async function (state, ...args) {
       if (accessGlobalState) {
         const result = await (action as Function)(
           state,
@@ -165,23 +165,23 @@ export function selector<S, T>(
         setter(state, result);
       }
       return {
-        ...state,
+        ...(state as S),
       };
-    };
+    } as SelectorReturnType<A>;
   }
 
   // Handle Sync Reducers.
   else {
-    return function (state: S, ...args: Parameters<typeof action>): S {
+    return function (state, ...args) {
       if (accessGlobalState) {
         setter(state, (action as Function)(state, getter(state), ...args));
       } else {
         setter(state, (action as Function)(getter(state), ...args));
       }
       return {
-        ...state,
+        ...(state as S),
       };
-    };
+    } as SelectorReturnType<A>;
   }
 }
 
@@ -192,17 +192,17 @@ export function superSelector<S>(
   return selector(selectorPath, action, true);
 }
 
-type SelectorObject<S, T> = {
-  getter: (state: S) => T;
-  setter: (_state: S, value: T) => T;
+type SelectorObject<V> = {
+  getter: (state: unknown) => V;
+  setter: (_state: unknown, value: V) => V;
 };
 
-function createSelector<S, T>(selector: string): SelectorObject<S, T> {
+function createSelector<V>(selector: string): SelectorObject<V> {
   if (/^state\.[\w\[\]\d\.]+$/.test(selector)) {
     return {
       getter: new Function("state", `return ${selector}`),
       setter: new Function("state", "value", `${selector} = value`),
-    } as SelectorObject<S, T>;
+    } as SelectorObject<V>;
   }
 
   throw new Error(
@@ -243,7 +243,7 @@ type Actions = {
   asyncInc: (amount: number) => Promise<State>;
 };
 
-// type DecrementType = Actions["decrement"];
+type DecrementType = Actions["decrement"];
 
 const store = createStore<State, Actions>({
   state: {
@@ -275,17 +275,10 @@ const store = createStore<State, Actions>({
     };
   },
 
-  decrement(state, amount) {
-    return {
-      ...state,
-      count: state.count - amount,
-    };
-  },
-  // decrement: selector2("state.count", (count: number, amount: number) => {
-  //   return count - amount;
-  // }),
-
-  // decrement: sel<State, number>("x", (x) => x),
+  decrement: selector<DecrementType, number>(
+    "state.count",
+    (count, amount) => count - amount
+  ),
 });
 
 store.getState().count;

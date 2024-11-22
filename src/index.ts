@@ -1,15 +1,20 @@
 // MiniRDX by Wojciech Ludwin, @ludekarts
 
-// Basic action.
-type Action<S> = (state: S, ...args: any[]) => S | Promise<S>;
+// Store API action.
+type Action<S> = (...args: any[]) => S | Promise<S>;
 
 // Colection of actions.
-type ActionStore<S> = { [key: string]: Action<S> };
+type ActionStore<S> = Record<string, Action<S>>;
 
-// Action listener callback decelared with "store.on()"" method.
+// Actions handling state updates.
+type ActionWithState<S, A extends Record<string, (...args: any[]) => any>> = {
+  [K in keyof A]: (state: S, ...args: Parameters<A[K]>) => ReturnType<A[K]>;
+};
+
+// Action listener decelared with "store.on()"" method.
 type ActionListener<S, A> = (state: S, actionName: keyof A) => void;
 
-// Internal list of all action listeners.
+// Internal collextion of all action listeners.
 type ActionListenerColection<S, A> = Map<string, ActionListener<S, A>[]>;
 
 // Generic Promise resolve callback.
@@ -26,7 +31,7 @@ type OmitFirstParam<T extends (...args: any[]) => any> = T extends (
 const protectedKeys = ["on", "state", "getState"];
 
 export function createStore<S, A extends ActionStore<S>>(
-  config: { state: S } & A
+  config: { state: S } & ActionWithState<S, A>
 ) {
   let { state, ...actions } = config;
   type Actions = typeof actions;
@@ -38,15 +43,22 @@ export function createStore<S, A extends ActionStore<S>>(
     if (protectedKeys.includes(key)) {
       throw new Error(`MiniRdxError: "${key}" is a reserved keyword`);
     }
-    acc[key as keyof Actions] = (...args: OmitFirstParam<typeof action>) => {
-      return new Promise((resolve) => {
-        const action = (state: S) => (action as Function)(state, ...args);
-        resolver(key, action, resolve);
+
+    if (typeof action !== "function") {
+      throw new Error(`MiniRdxError: "${key}" should be a function`);
+    }
+
+    acc[key as keyof Actions] = (...args: Parameters<typeof action>) =>
+      new Promise((resolve) => {
+        resolver(
+          key,
+          (state: S) => (action as Function)(state, ...args),
+          resolve
+        );
       });
-    };
 
     return acc;
-  }, {} as { [K in keyof Actions]: (...args: OmitFirstParam<Actions[K]>) => S | Promise<S> });
+  }, {} as { [K in keyof Actions]: (...args: OmitFirstParam<Actions[K]>) => Promise<S> });
 
   function resolver(
     actionName: string,
@@ -126,23 +138,30 @@ export function createStore<S, A extends ActionStore<S>>(
 
 // ---- Selectors ----------------
 
-type SelectorAction<T> = (slice: T, ...payload: any[]) => T | Promise<T>;
+type SelectorAction<T> = (slice: T, ...args: any[]) => T | Promise<T>;
 
-export function selector<S>(
+export function selector<S, T>(
   selectorPath: string,
-  action: Action<S>,
+  action: SelectorAction<T>,
   accessGlobalState = false
-): Action<S> {
-  const { getter, setter } = createSelector<S>(selectorPath);
+): (state: S, ...args: any[]) => S | Promise<S> {
+  const { getter, setter } = createSelector<S, T>(selectorPath);
 
   // Handle Async Reducers.
   if (isAsync(action)) {
-    return async function (state, ...payload) {
+    return async function (
+      state: S,
+      ...args: Parameters<typeof action>
+    ): Promise<S> {
       if (accessGlobalState) {
-        const result = await action(state, getter(state), ...payload);
+        const result = await (action as Function)(
+          state,
+          getter(state),
+          ...args
+        );
         setter(state, result);
       } else {
-        const result = action(getter(state), ...payload);
+        const result = await action(getter(state), ...args);
         setter(state, result);
       }
       return {
@@ -153,23 +172,17 @@ export function selector<S>(
 
   // Handle Sync Reducers.
   else {
-    return (state, ...payload) => {
+    return function (state: S, ...args: Parameters<typeof action>): S {
       if (accessGlobalState) {
-        setter(state, action(state, getter(state), ...payload));
+        setter(state, (action as Function)(state, getter(state), ...args));
       } else {
-        setter(state, action(getter(state), ...payload));
+        setter(state, (action as Function)(getter(state), ...args));
       }
       return {
         ...state,
       };
     };
   }
-}
-
-function selectorX<S>(): Action<S> {
-  return (state, ...args) => {
-    return state;
-  };
 }
 
 export function superSelector<S>(
@@ -179,24 +192,17 @@ export function superSelector<S>(
   return selector(selectorPath, action, true);
 }
 
-type SelectorObject<S> = {
-  getter: (state: S) => any;
-  setter: (_state: S, value: any) => any;
+type SelectorObject<S, T> = {
+  getter: (state: S) => T;
+  setter: (_state: S, value: T) => T;
 };
 
-function createSelector<S>(selector: string): SelectorObject<S> {
-  if (typeof selector === "string") {
-    if (selector === "") {
-      return {
-        getter: (state: S) => state,
-        setter: (_state: S, value: unknown) => value,
-      };
-    } else if (/^state\.[\w\[\]\d\.]+$/.test(selector)) {
-      return {
-        getter: new Function("state", `return ${selector}`),
-        setter: new Function("state", "value", `${selector} = value`),
-      } as SelectorObject<S>;
-    }
+function createSelector<S, T>(selector: string): SelectorObject<S, T> {
+  if (/^state\.[\w\[\]\d\.]+$/.test(selector)) {
+    return {
+      getter: new Function("state", `return ${selector}`),
+      setter: new Function("state", "value", `${selector} = value`),
+    } as SelectorObject<S, T>;
   }
 
   throw new Error(
@@ -231,10 +237,13 @@ interface State {
 }
 
 type Actions = {
-  hello: (s: State, text: string) => State;
-  increment: (s: State, amount: number) => State;
-  decrement: (s: State, amount: number) => State;
+  hello: (text: string) => State;
+  increment: (amount: number) => State;
+  decrement: (amount: number) => State;
+  asyncInc: (amount: number) => Promise<State>;
 };
+
+// type DecrementType = Actions["decrement"];
 
 const store = createStore<State, Actions>({
   state: {
@@ -258,15 +267,34 @@ const store = createStore<State, Actions>({
     };
   },
 
-  // decrement: selectorX<State>("state.count", (count, amount) => count - 1),
-  decrement: selectorX<State>(),
+  async asyncInc(state, amount) {
+    const square = await Promise.resolve(amount * 2);
+    return {
+      ...state,
+      count: state.count + square,
+    };
+  },
+
+  decrement(state, amount) {
+    return {
+      ...state,
+      count: state.count - amount,
+    };
+  },
+  // decrement: selector2("state.count", (count: number, amount: number) => {
+  //   return count - amount;
+  // }),
+
+  // decrement: sel<State, number>("x", (x) => x),
 });
 
 store.getState().count;
 store.getState((s) => s.text);
-// store.decrement(3);
-// store.decrement(2);
+store.decrement(3);
+store.decrement(2);
 store.hello("Hello, World!");
+
+store.asyncInc(10);
 
 store.getState().text;
 

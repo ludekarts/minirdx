@@ -16,6 +16,8 @@ const counterStore = createStore({
   },
 
   increment: (state, count) => {
+    console.log("Incrementing by", count);
+
     return { ...state, counter: state.counter + count };
   },
 
@@ -59,7 +61,10 @@ const buttons = document.getElementById("buttons");
 buttons.addEventListener("click", async (event) => {
   switch (event.target.dataset.action) {
     case "inc":
-      return counterStore.increment(1);
+      const x = counterStore.increment(1);
+      console.log(x);
+
+      return;
     case "dec":
       return counterStore.decrement(1);
     case "asyncInc":

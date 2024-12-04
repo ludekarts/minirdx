@@ -1,15 +1,7 @@
 // MiniRDX by Wojciech Ludwin, @ludekarts
 
 // Store API action.
-type Action<S> = (...args: any[]) => S | Promise<S>;
-
-// Colection of actions.
-type ActionStore<S> = Record<string, Action<S>>;
-
-// Actions handling state updates.
-type ActionWithState<S, A extends Record<string, (...args: any[]) => any>> = {
-  [K in keyof A]: (state: S, ...args: Parameters<A[K]>) => ReturnType<A[K]>;
-};
+type Action<S> = (state: S, ...args: any[]) => S | Promise<S>;
 
 // Action listener decelared with "store.on()"" method.
 type ActionListener<S, A> = (state: S, actionName: keyof A) => void;
@@ -30,35 +22,41 @@ type OmitFirstParam<T extends (...args: any[]) => any> = T extends (
 
 const protectedKeys = ["on", "state", "getState"];
 
-export function createStore<S, A extends ActionStore<S>>(
-  config: { state: S } & ActionWithState<S, A>
-) {
-  let { state, ...actions } = config;
+export function createStore<S, A extends Record<string, Action<S>>>(config: {
+  state: S;
+  actions: A;
+}) {
+  let { state, actions } = config;
   type Actions = typeof actions;
 
   const globalListeners: ActionListener<S, A>[] = [];
   const actionListeners: ActionListenerColection<S, A> = new Map();
 
-  const apiActions = Object.entries(actions).reduce((acc, [key, action]) => {
-    if (protectedKeys.includes(key)) {
-      throw new Error(`MiniRdxError: "${key}" is a reserved keyword`);
-    }
+  const apiActions = Object.fromEntries(
+    Object.entries(actions).map(([key, action]) => {
+      if (protectedKeys.includes(key)) {
+        throw new Error(`MiniRdxError: "${key}" is a reserved keyword`);
+      }
 
-    if (typeof action !== "function") {
-      throw new Error(`MiniRdxError: "${key}" should be a function`);
-    }
+      if (typeof action !== "function") {
+        throw new Error(`MiniRdxError: "${key}" should be a function`);
+      }
 
-    acc[key as keyof Actions] = (...args: Parameters<typeof action>) =>
-      new Promise((resolve) => {
-        resolver(
-          key,
-          (state: S) => (action as Function)(state, ...args),
-          resolve
-        );
-      });
-
-    return acc;
-  }, {} as { [K in keyof Actions]: (...args: OmitFirstParam<Actions[K]>) => Promise<S> });
+      return [
+        key,
+        (...args: OmitFirstParam<typeof action>) =>
+          new Promise((resolve) => {
+            resolver(
+              key,
+              (state: S) => (action as Function)(state, ...args),
+              resolve
+            );
+          }),
+      ];
+    })
+  ) as {
+    [K in keyof A]: (...args: OmitFirstParam<A[K]>) => Promise<S>;
+  };
 
   function resolver(
     actionName: string,

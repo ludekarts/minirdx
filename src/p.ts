@@ -1,4 +1,8 @@
 type Action<S> = (state: S, ...args: any[]) => S;
+type Selector<S, T> = (state: S, ...args: any[]) => T;
+type HigherOrderAction<S> = Selector<S, any>;
+type AnyAction<S> = Action<S> | HigherOrderAction<S>;
+
 type OmitFirstParam<T extends (...args: any[]) => any> = T extends (
   state: any,
   ...args: infer P
@@ -6,7 +10,17 @@ type OmitFirstParam<T extends (...args: any[]) => any> = T extends (
   ? P
   : never;
 
-function createStore<S, A extends Record<string, Action<S>>>(config: {
+function selector<S, K extends keyof S>(
+  path: K,
+  fn: (value: S[K], ...args: any[]) => S[K]
+): (state: S, ...args: any[]) => S {
+  return (state, ...args) => {
+    const newValue = fn(state[path], ...args);
+    return { ...state, [path]: newValue };
+  };
+}
+
+function createStore<S, A extends Record<string, AnyAction<S>>>(config: {
   state: S;
   actions: A;
 }) {
@@ -17,7 +31,9 @@ function createStore<S, A extends Record<string, Action<S>>>(config: {
       return [
         key,
         async (...args: OmitFirstParam<typeof action>) => {
-          state = action(state, ...args);
+          if (typeof action === "function") {
+            state = action(state, ...args);
+          }
           return state;
         },
       ];
@@ -34,6 +50,7 @@ function createStore<S, A extends Record<string, Action<S>>>(config: {
   };
 }
 
+// Store configuration
 const store = createStore({
   state: {
     count: 0,
@@ -47,22 +64,19 @@ const store = createStore({
     increment(state, amount: number) {
       return { ...state, count: state.count + amount };
     },
+
+    decrement: selector("count", (count, amount: number) => count - amount),
   },
 });
 
-store.getState().count;
-store.hello("world"); // TypeScript correctly infers this
-store.increment(1); // TypeScript correctly infers this
+// Example usage
+(async () => {
+  await store.increment(5);
+  console.log(store.getState()); // { count: 5, text: "" }
 
-// store.decrement(3);
-// store.hello("Hello, World!");
-// store.hello("Hello, World!");
-// store.decrement(2);
+  await store.decrement(2);
+  console.log(store.getState()); // { count: 3, text: "" }
 
-// store.getState().text;
-
-// store.hello("Hello, World!");
-
-// store.on("hello", (state, action) => {
-//   console.log(`Hello action: "${action}" was called with text: ${state.text}`);
-// });
+  await store.hello("Hello World");
+  console.log(store.getState()); // { count: 3, text: "Hello World" }
+})();

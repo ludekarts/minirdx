@@ -15,42 +15,48 @@ const counterStore = createStore({
     },
   },
 
-  increment: (state, count) => {
-    console.log("Incrementing by", count);
+  actions: {
+    increment: (state, count) => {
+      console.log("Incrementing by", count);
 
-    return { ...state, counter: state.counter + count };
+      return { ...state, counter: state.counter + count };
+    },
+
+    decrement: (state, count) => {
+      return { ...state, counter: state.counter - count };
+    },
+
+    reset: (state) => {
+      return { ...state, counter: 0 };
+    },
+
+    toggleLoader: (state) => {
+      return { ...state, showLoader: !state.showLoader };
+    },
+
+    asyncIncrement: async (state) => {
+      const amount = await getRandomAmout();
+      console.log("async inc by", amount);
+      return { ...state, counter: counterStore.getState().counter + amount };
+    },
+
+    asyncDecrement: (state) => {
+      return Promise.resolve({ ...state, counter: state.counter - 5 });
+    },
+
+    deepUpdate: selector("state.deep.nested.value", (value, emoji) => {
+      return value === "🤯" ? emoji : "🤯";
+    }),
+
+    deepUpdateAsync: selector(
+      "state.deep.nested.value",
+      async (value, emoji) => {
+        console.log("Waiting");
+        await wait(1000);
+        return value === "🤯" ? emoji : "🤯";
+      }
+    ),
   },
-
-  decrement: (state, count) => {
-    return { ...state, counter: state.counter - count };
-  },
-
-  reset: (state) => {
-    return { ...state, counter: 0 };
-  },
-
-  toggleLoader: (state) => {
-    return { ...state, showLoader: !state.showLoader };
-  },
-
-  asyncIncrement: async (state) => {
-    const amount = await getRandomAmout();
-    return { ...state, counter: state.counter + amount };
-  },
-
-  asyncDecrement: (state) => {
-    return Promise.resolve({ ...state, counter: state.counter - 5 });
-  },
-
-  deepUpdate: selector("state.deep.nested.value", (value, emoji) => {
-    return value === "🤯" ? emoji : "🤯";
-  }),
-
-  deepUpdateAsync: selector("state.deep.nested.value", async (value, emoji) => {
-    console.log("Waiting");
-    await wait(1000);
-    return value === "🤯" ? emoji : "🤯";
-  }),
 });
 
 // ---- Usage ------------------

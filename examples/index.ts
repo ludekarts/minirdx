@@ -11,18 +11,18 @@ const store = createStore({
     },
   },
   actions: {
-    hello(state, text) {
+    hello(state, text: string) {
       return { ...state, text };
     },
 
-    increment(state, amount) {
+    increment(state, amount: number) {
       return {
         ...state,
         count: state.count + amount,
       };
     },
 
-    async asyncInc(state, amount) {
+    async asyncInc(state, amount: number) {
       const square = await Promise.resolve(amount * 2);
       return {
         ...state,
@@ -30,20 +30,25 @@ const store = createStore({
       };
     },
 
-    decrement: selector<number>(
-      "state.count",
-      (count, amount) => count - amount
-    ),
+    // decrement: selector<number>(
+    //   "state.count",
+    //   (count, amount: number) => count - amount
+    // ),
+
+    decrement: selector("hello", (state, amount: number, text: string) => {
+      return { ...state, count: state.count - amount, text };
+    }),
   },
 });
 
 store.getState().count;
 store.getState((s) => s.text);
-store.decrement(3);
-store.decrement(2);
+store.decrement(2, "Hello, World!");
+store.decrement(2, "Hello, World!");
 store.hello("Hello, World!");
 
-store.asyncInc(10);
+store.asyncInc(5);
+store.increment(5);
 
 store.getState().text;
 

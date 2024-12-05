@@ -136,66 +136,53 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
 
 // ---- Selectors ----------------
 
-type SelectorReturnType<A extends (...args: any[]) => any> = (
-  state: ReturnType<A>,
-  ...args: Parameters<A>
-) => ReturnType<A> extends Promise<infer R> ? Promise<R> : ReturnType<A>;
-
-export function selector<A extends (...args: any[]) => any, S>(
-  selectorPath: string,
-  action: (state: S, ...args: Parameters<A>) => S | Promise<S>,
-  accessGlobalState = false
-): SelectorReturnType<A> {
-  const { getter, setter } = createSelector<S>(selectorPath);
-
-  // Handle Async Reducers.
-  if (isAsync(action)) {
-    return async function (state, ...args) {
-      if (accessGlobalState) {
-        const result = await (action as Function)(
-          state,
-          getter(state),
-          ...args
-        );
-        setter(state, result);
-      } else {
-        const result = await action(getter(state), ...args);
-        setter(state, result);
-      }
-      return {
-        ...(state as S),
-      };
-    } as SelectorReturnType<A>;
-  }
-
-  // Handle Sync Reducers.
-  else {
-    return function (state, ...args) {
-      if (accessGlobalState) {
-        setter(state, (action as Function)(state, getter(state), ...args));
-      } else {
-        setter(state, (action as Function)(getter(state), ...args));
-      }
-      return {
-        ...(state as S),
-      };
-    } as SelectorReturnType<A>;
-  }
+export function selector<S, Args extends any[]>(
+  path: string,
+  action: (state: S, ...args: Args) => S
+) {
+  const { getter, setter } = createSelector(path);
+  return function response(state: S, ...args: Args): S {
+    const result = action(getter(state) as S, ...args);
+    setter(state, result);
+    return { ...state };
+  };
 }
 
-export function superSelector<S>(
-  selectorPath: string,
-  action: Action<S>
-): Action<S> | Promise<Action<S>> {
-  return selector(selectorPath, action, true);
-}
+// export function selector<R>(
+//   selectorPath: string,
+//   action: (value: R, ...args: any[]) => R
+// ): <S>(state: S, ...args: any[]) => S | Promise<S> {
+//   const { getter, setter } = createSelector(selectorPath);
+
+//   //  Handle Async Reducers.
+//   if (isAsync(action)) {
+//     return async function (state, ...args) {
+//       const result = await action(getter(state) as R, ...args);
+//       setter(state, result);
+
+//       return {
+//         ...state,
+//       };
+//     };
+//   }
+
+//   // Handle Sync Reducers.
+//   else {
+//     return function (state, ...args) {
+//       setter(state, (action as Function)(getter(state) as R, ...args));
+//       return {
+//         ...state,
+//       };
+//     };
+//   }
+// }
 
 type SelectorObject<V> = {
   getter: (state: unknown) => V;
   setter: (_state: unknown, value: V) => V;
 };
 
-function createSelector<V>(selector: string): SelectorObject<V> {
+export function createSelector<V>(selector: string): SelectorObject<V> {
   if (/^state\.[\w\[\]\d\.]+$/.test(selector)) {
     return {
       getter: new Function("state", `return ${selector}`),

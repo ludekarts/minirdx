@@ -32,7 +32,7 @@ const store = createStore({
 
     decrement: selector(
       "state.count",
-      (count: number, amount: number, text: string) => {
+      async (count: number, amount: number, text: string) => {
         console.log(text);
         return count - amount;
       }
@@ -43,7 +43,7 @@ const store = createStore({
 store.getState().count;
 store.getState((s) => s.text);
 store.decrement(2, "Hello, World!");
-store.decrement(2, "Hello, World!");
+store.decrement(2, "12");
 store.hello("Hello, World!");
 
 store.asyncInc(5);

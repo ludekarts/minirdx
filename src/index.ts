@@ -142,58 +142,21 @@ export function selector<S, Args extends any[]>(
 ) {
   const { getter, setter } = createSelector(path);
 
-  return async function response(
-    state: S,
-    ...args: OmitFirstParam<typeof action>
-  ) {
-    const result = isAsync(action)
-      ? await (action as Function)(getter(state), ...args)
-      : (action as Function)(getter(state), ...args);
-    setter(state, result);
-    return { ...state };
+  return function response(state: S, ...args: OmitFirstParam<typeof action>) {
+    if (isAsync(action)) {
+      return Promise.resolve((action as Function)(getter(state), ...args)).then(
+        (result) => {
+          setter(state, result);
+          return { ...state };
+        }
+      );
+    } else {
+      const result = (action as Function)(getter(state), ...args);
+      setter(state, result);
+      return { ...state };
+    }
   };
 }
-
-// export function selector<S, Args extends any[]>(
-//   path: string,
-//   action: (slice: S, ...args: Args) => S
-// ) {
-//   const { getter, setter } = createSelector(path);
-//   return function response(state: S, ...args: Args): S {
-//     const result = action(getter(state) as S, ...args);
-//     setter(state, result);
-//     return { ...state };
-//   };
-// }
-
-// export function selector<R>(
-//   selectorPath: string,
-//   action: (value: R, ...args: any[]) => R
-// ): <S>(state: S, ...args: any[]) => S | Promise<S> {
-//   const { getter, setter } = createSelector(selectorPath);
-
-//   //  Handle Async Reducers.
-// if (isAsync(action)) {
-//   return async function (state, ...args) {
-//     const result = await action(getter(state) as R, ...args);
-//     setter(state, result);
-
-//     return {
-//       ...state,
-//     };
-//   };
-// }
-
-//   // Handle Sync Reducers.
-//   else {
-//     return function (state, ...args) {
-//       setter(state, (action as Function)(getter(state) as R, ...args));
-//       return {
-//         ...state,
-//       };
-//     };
-//   }
-// }
 
 type SelectorObject<V> = {
   getter: (state: unknown) => V;

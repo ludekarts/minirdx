@@ -138,15 +138,33 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
 
 export function selector<S, Args extends any[]>(
   path: string,
-  action: (state: S, ...args: Args) => S
+  action: (...args: Args) => any
 ) {
   const { getter, setter } = createSelector(path);
-  return function response(state: S, ...args: Args): S {
-    const result = action(getter(state) as S, ...args);
+
+  return async function response(
+    state: S,
+    ...args: OmitFirstParam<typeof action>
+  ) {
+    const result = isAsync(action)
+      ? await (action as Function)(getter(state), ...args)
+      : (action as Function)(getter(state), ...args);
     setter(state, result);
     return { ...state };
   };
 }
+
+// export function selector<S, Args extends any[]>(
+//   path: string,
+//   action: (slice: S, ...args: Args) => S
+// ) {
+//   const { getter, setter } = createSelector(path);
+//   return function response(state: S, ...args: Args): S {
+//     const result = action(getter(state) as S, ...args);
+//     setter(state, result);
+//     return { ...state };
+//   };
+// }
 
 // export function selector<R>(
 //   selectorPath: string,
@@ -155,16 +173,16 @@ export function selector<S, Args extends any[]>(
 //   const { getter, setter } = createSelector(selectorPath);
 
 //   //  Handle Async Reducers.
-//   if (isAsync(action)) {
-//     return async function (state, ...args) {
-//       const result = await action(getter(state) as R, ...args);
-//       setter(state, result);
+// if (isAsync(action)) {
+//   return async function (state, ...args) {
+//     const result = await action(getter(state) as R, ...args);
+//     setter(state, result);
 
-//       return {
-//         ...state,
-//       };
+//     return {
+//       ...state,
 //     };
-//   }
+//   };
+// }
 
 //   // Handle Sync Reducers.
 //   else {

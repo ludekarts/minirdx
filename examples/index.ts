@@ -30,14 +30,13 @@ const store = createStore({
       };
     },
 
-    // decrement: selector<number>(
-    //   "state.count",
-    //   (count, amount: number) => count - amount
-    // ),
-
-    decrement: selector("hello", (state, amount: number, text: string) => {
-      return { ...state, count: state.count - amount, text };
-    }),
+    decrement: selector(
+      "state.count",
+      (count: number, amount: number, text: string) => {
+        console.log(text);
+        return count - amount;
+      }
+    ),
   },
 });
 

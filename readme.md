@@ -1,3 +1,5 @@
-# MiniRdx
+# MiniRDX
 
-State management library inspired by Redux and PubSub pattern.
+![logo](./assets/miniRDX_logo.svg)
+
+Minimal state management library. Inspired by Redux and Pub/Sub pattern.

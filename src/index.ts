@@ -1,7 +1,7 @@
 // MiniRDX by Wojciech Ludwin, @ludekarts
 
 // Store API action.
-type Action<S> = (state: S, ...args: any[]) => S | Promise<S>;
+type Action<S> = (state: () => S, ...args: any[]) => S | Promise<S>;
 
 // Action listener decelared with "store.on()"" method.
 type ActionListener<S, A> = (state: S, actionName: keyof A) => void;
@@ -48,7 +48,7 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
           new Promise((resolve) => {
             resolver(
               key,
-              (state: S) => (action as Function)(state, ...args),
+              (state: () => S) => (action as Function)(state, ...args),
               resolve
             );
           }),
@@ -63,7 +63,7 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
     action: Action<S>,
     resolve: PromiseResolve<S>
   ) {
-    const newState = action(state);
+    const newState = action(getState);
     isPromise<S>(newState)
       ? newState.then((resolvedState: S) =>
           updateState(resolvedState, actionName, resolve)
@@ -91,12 +91,12 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
     resolve(state);
   }
 
+  function getState(): S {
+    return state;
+  }
+
   return {
-    getState<T = S>(selector?: (state: S) => T): T {
-      return typeof selector === "function"
-        ? selector(state)
-        : (state as unknown as T);
-    },
+    state: getState,
 
     on(
       action: keyof Actions | ActionListener<S, A>,
@@ -142,18 +142,21 @@ export function selector<S, Args extends any[]>(
 ) {
   const { getter, setter } = createSelector(path);
 
-  return function response(state: S, ...args: OmitFirstParam<typeof action>) {
+  return function response(
+    state: () => S,
+    ...args: OmitFirstParam<typeof action>
+  ) {
     if (isAsync(action)) {
-      return Promise.resolve((action as Function)(getter(state), ...args)).then(
-        (result) => {
-          setter(state, result);
-          return { ...state };
-        }
-      );
+      return Promise.resolve(
+        (action as Function)(getter(state()), ...args)
+      ).then((result) => {
+        const newState = setter(state(), result) as S;
+        return { ...newState };
+      });
     } else {
-      const result = (action as Function)(getter(state), ...args);
-      setter(state, result);
-      return { ...state };
+      const result = (action as Function)(getter(state()), ...args);
+      const newState = setter(state(), result) as S;
+      return { ...newState };
     }
   };
 }
@@ -167,7 +170,11 @@ export function createSelector<V>(selector: string): SelectorObject<V> {
   if (/^state\.[\w\[\]\d\.]+$/.test(selector)) {
     return {
       getter: new Function("state", `return ${selector}`),
-      setter: new Function("state", "value", `${selector} = value`),
+      setter: new Function(
+        "state",
+        "value",
+        `{${selector} = value; return state;}`
+      ),
     } as SelectorObject<V>;
   }
 

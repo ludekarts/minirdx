@@ -1,6 +1,20 @@
 import "../dist/minirdx.umd.js";
 
-const { createStore, selector } = MiniRdx;
+const { createStore, selector, link } = MiniRdx;
+
+const emojiStore = createStore({
+  state: {
+    emoji: "🤯",
+  },
+
+  actions: {
+    randomEmoji: (state) => {
+      const emojis = ["🤯", "🤩", "🎉", "⚡", "🏝️", "👍"];
+      const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+      return { ...state(), emoji };
+    },
+  },
+});
 
 // New API Design:
 
@@ -13,6 +27,7 @@ const counterStore = createStore({
         value: "🤯",
       },
     },
+    emoji: link(emojiStore, (es) => es.emoji),
   },
 
   actions: {
@@ -36,7 +51,7 @@ const counterStore = createStore({
     asyncIncrement: async (state) => {
       const amount = await getRandomAmout(2000);
       console.log("async inc by", amount);
-      return { ...state(), counter: counterStore.getState().counter + amount };
+      return { ...state(), counter: counterStore.state().counter + amount };
     },
 
     asyncDecrement: (state) => {
@@ -90,15 +105,18 @@ buttons.addEventListener("click", async (event) => {
       await counterStore.deepUpdateAsync("💥");
       console.log("Async Deep end");
       return;
+    case "updateEmoji":
+      console.log(await emojiStore.randomEmoji());
+      return;
 
     case "show":
-      return console.log(counterStore.getState());
+      return console.log(counterStore.state());
   }
 });
 
 const cancelGlobalSub = counterStore.on((state, actionName) => {
   console.log(`State ${actionName}:`, state);
-  counter.innerHTML = state.counter;
+  counter.innerHTML = `${state.counter} | ${state.emoji}`;
 });
 
 const cancelIncSub = counterStore.on("increment", (state) =>

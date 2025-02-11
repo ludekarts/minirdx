@@ -29,13 +29,12 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
   let { state, actions } = config;
   type Actions = typeof actions;
 
-  const linksList: any[] = [];
   const globalListeners: ActionListener<S, A>[] = [];
   const actionListeners: ActionListenerColection<S, A> = new Map();
 
-  // Scan the state object and pull out all links values.
+  // Scan State object and pull out all linked values.
 
-  scanObject(state, (key, value, parent, path) => {
+  scanObject(state, (value: any, path: string) => {
     if (isLink(value)) {
       const { setter } = createSelector(`state.${path}`);
       const updateLinkValue = (value: any) => {
@@ -111,7 +110,7 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
     return state;
   }
 
-  // Enable manual state notification.
+  // Manual state notification.
   function notify() {
     globalListeners.length &&
       globalListeners.forEach((listener) => listener(state, "link"));
@@ -207,9 +206,9 @@ export function createSelector<V>(selector: string): SelectorObject<V> {
 
 // ---- Link values --------------
 
-export function link(...args) {
+export function link<T>(...args: any[]) {
   return Object.freeze({
-    _rdx_link_: (updateLinkValue) => {
+    _rdx_link_: (updateLinkValue: (value: T) => void) => {
       const processor = args.pop();
       const stores = args;
       const update = () => {
@@ -235,26 +234,6 @@ function isAsync(fn: Function) {
   return fn.constructor.name === "AsyncFunction";
 }
 
-// function scanObjectForLinks(obj: any, linksList: any[], notify: Function) {
-//   if (Array.isArray(obj)) {
-//     obj.forEach((item) => scanObjectForLinks(item, linksList, notify));
-//   } else if (typeof obj === "object") {
-//     for (const key in obj) {
-//       if (obj.hasOwnProperty(key)) {
-//         if (isLink(obj[key])) {
-//           const linkIndex = linksList.length;
-//           linksList[linkIndex] = undefined;
-//           obj[key]._rdx_link_(linksList, linkIndex, notify);
-//           obj[key] = linksList[linkIndex];
-//           console.log("index", linksList);
-//         }
-//         scanObjectForLinks(obj[key], linksList, notify);
-//       }
-//     }
-//   }
-//   return obj;
-// }
-
 function scanObject(obj: any, callback: Function, path = "") {
   if (typeof obj !== "object" || obj === null) {
     return;
@@ -266,7 +245,7 @@ function scanObject(obj: any, callback: Function, path = "") {
       const keyString = /\d+/.test(key) ? `[${key}]` : `.${key}`;
       const currentPath = path ? `${path}${keyString}` : key;
 
-      callback(key, value, obj, currentPath);
+      callback(value, currentPath);
 
       if (typeof value === "object" && value !== null) {
         scanObject(value, callback, currentPath);

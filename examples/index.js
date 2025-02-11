@@ -16,6 +16,23 @@ const emojiStore = createStore({
   },
 });
 
+const userStore = createStore({
+  state: {
+    name: "John Doe",
+    age: 30,
+  },
+
+  actions: {
+    updateName: (state, name) => {
+      return { ...state(), name };
+    },
+
+    updateAge: (state, age) => {
+      return { ...state(), age };
+    },
+  },
+});
+
 // New API Design:
 
 const counterStore = createStore({
@@ -28,6 +45,7 @@ const counterStore = createStore({
       },
     },
     emoji: link(emojiStore, (es) => es.emoji),
+    user: link(userStore, emojiStore, (us, es) => `[${es.emoji}]: ${us.name}!`),
   },
 
   actions: {
@@ -83,9 +101,7 @@ buttons.addEventListener("click", async (event) => {
   switch (event.target.dataset.action) {
     case "inc":
       const x = counterStore.increment(1);
-      console.log(x);
-
-      return;
+      return console.log(x);
     case "dec":
       return counterStore.decrement(1);
     case "asyncInc":
@@ -108,6 +124,9 @@ buttons.addEventListener("click", async (event) => {
     case "updateEmoji":
       console.log(await emojiStore.randomEmoji());
       return;
+    case "updateUsername":
+      await userStore.updateName("Joe Black");
+      return;
 
     case "show":
       return console.log(counterStore.state());
@@ -116,7 +135,7 @@ buttons.addEventListener("click", async (event) => {
 
 const cancelGlobalSub = counterStore.on((state, actionName) => {
   console.log(`State ${actionName}:`, state);
-  counter.innerHTML = `${state.counter} | ${state.emoji}`;
+  counter.innerHTML = `${state.counter} | ${state.user}`;
 });
 
 const cancelIncSub = counterStore.on("increment", (state) =>

@@ -11,22 +11,32 @@
     "dist"
   ],
   "type": "module",
-  "main": "./dist/minirdx.umd.js",
-  "module": "./dist/minirdx.es.js",
+  "main": "./dist/minirdx.index.cjs.js",
+  "module": "./dist/minirdx.index.es.js",
   "types": "./dist/minirdx.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/minirdx.d.ts",
-      "import": "./dist/minirdx.es.js",
-      "require": "./dist/minirdx.umd.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/minirdx.index.es.js",
+      "require": "./dist/minirdx.index.cjs.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/minirdx.react.es.js",
+      "require": "./dist/minirdx.react.cjs.js"
     }
   },
   "keywords": [],
   "author": "Wojciech Ludwin << @ludekarts >>",
   "license": "ISC",
   "devDependencies": {
+    "@types/react": "^19.0.10",
+    "react": "^19.0.0",
     "typescript": "^5.5.3",
     "vite": "^5.4.1",
     "vite-plugin-dts": "^4.2.1"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
   }
 }

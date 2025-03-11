@@ -39,7 +39,7 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
       const { setter } = createSelector(`state.${path}`);
       const updateLinkValue = (value: any) => {
         setter(getState(), value);
-        notify();
+        notifyOnLinkUpdate();
       };
       value._rdx_link_(updateLinkValue);
     }
@@ -110,10 +110,14 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
     return state;
   }
 
-  // Manual state notification.
-  function notify() {
+  // Link update notifications.
+  function notifyOnLinkUpdate() {
+    // Creates new state since link's update mutates initial state.
+    const newState = (
+      isObject(state) ? { ...state } : Array.isArray(state) ? [...state] : state
+    ) as S;
     globalListeners.length &&
-      globalListeners.forEach((listener) => listener(state, "link"));
+      globalListeners.forEach((listener) => listener(newState, "link"));
   }
 
   return {
@@ -259,5 +263,17 @@ function isLink(value: any): boolean {
     value !== null &&
     typeof value === "object" &&
     value.hasOwnProperty("_rdx_link_")
+  );
+}
+
+function isObject(object: any): boolean {
+  return (
+    !!object &&
+    typeof object !== "symbol" &&
+    typeof object !== "string" &&
+    typeof object !== "number" &&
+    typeof object !== "boolean" &&
+    typeof object !== "function" &&
+    !Array.isArray(object)
   );
 }

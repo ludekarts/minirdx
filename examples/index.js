@@ -1,6 +1,37 @@
 import "../dist/minirdx.umd.js";
 
-const { createStore, selector } = MiniRdx;
+const { createStore, selector, link } = MiniRdx;
+
+const emojiStore = createStore({
+  state: {
+    emoji: "🤯",
+  },
+
+  actions: {
+    randomEmoji: (state) => {
+      const emojis = ["🤯", "🤩", "🎉", "⚡", "🏝️", "👍"];
+      const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+      return { ...state(), emoji };
+    },
+  },
+});
+
+const userStore = createStore({
+  state: {
+    name: "John Doe",
+    age: 30,
+  },
+
+  actions: {
+    updateName: (state, name) => {
+      return { ...state(), name };
+    },
+
+    updateAge: (state, age) => {
+      return { ...state(), age };
+    },
+  },
+});
 
 // New API Design:
 
@@ -13,6 +44,8 @@ const counterStore = createStore({
         value: "🤯",
       },
     },
+    emoji: link(emojiStore, (es) => es.emoji),
+    user: link(userStore, emojiStore, (us, es) => `[${es.emoji}]: ${us.name}!`),
   },
 
   actions: {
@@ -36,7 +69,7 @@ const counterStore = createStore({
     asyncIncrement: async (state) => {
       const amount = await getRandomAmout(2000);
       console.log("async inc by", amount);
-      return { ...state(), counter: counterStore.getState().counter + amount };
+      return { ...state(), counter: counterStore.state().counter + amount };
     },
 
     asyncDecrement: (state) => {
@@ -68,9 +101,7 @@ buttons.addEventListener("click", async (event) => {
   switch (event.target.dataset.action) {
     case "inc":
       const x = counterStore.increment(1);
-      console.log(x);
-
-      return;
+      return console.log(x);
     case "dec":
       return counterStore.decrement(1);
     case "asyncInc":
@@ -90,15 +121,21 @@ buttons.addEventListener("click", async (event) => {
       await counterStore.deepUpdateAsync("💥");
       console.log("Async Deep end");
       return;
+    case "updateEmoji":
+      console.log(await emojiStore.randomEmoji());
+      return;
+    case "updateUsername":
+      await userStore.updateName("Joe Black");
+      return;
 
     case "show":
-      return console.log(counterStore.getState());
+      return console.log(counterStore.state());
   }
 });
 
 const cancelGlobalSub = counterStore.on((state, actionName) => {
   console.log(`State ${actionName}:`, state);
-  counter.innerHTML = state.counter;
+  counter.innerHTML = `${state.counter} | ${state.user}`;
 });
 
 const cancelIncSub = counterStore.on("increment", (state) =>

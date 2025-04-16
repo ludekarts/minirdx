@@ -8,12 +8,19 @@ export default defineConfig({
       insertTypesEntry: true,
     }),
   ],
+
   build: {
     lib: {
       name: "MiniRdx",
-      formats: ["es", "cjs", "umd"],
-      entry: resolve(__dirname, "src/index.ts"),
-      fileName: (format) => `minirdx.${format}.js`,
+      formats: ["es", "cjs"],
+      entry: {
+        index: resolve(__dirname, "src/index.ts"),
+        react: resolve(__dirname, "src/react.ts"),
+      },
+      fileName: (format, entryName) => `minirdx.${entryName}.${format}.js`,
+    },
+    rollupOptions: {
+      external: ["react"],
     },
   },
 });

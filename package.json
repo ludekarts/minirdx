@@ -1,6 +1,6 @@
 {
   "name": "@ludekarts/minirdx",
-  "version": "0.3.0-alpha.0",
+  "version": "0.3.0",
   "description": "Minimal state management library",
   "scripts": {
     "dev": "vite build --watch",

@@ -6,13 +6,13 @@ type Action<S> = (state: () => S, ...args: any[]) => S | Promise<S>;
 // Action listener decelared with "store.on()"" method.
 type ActionListener<S, A> = (state: S, actionName: keyof A) => void;
 
-// Internal collextion of all action listeners.
+// Internal collection of all action listeners.
 type ActionListenerColection<S, A> = Map<string, ActionListener<S, A>[]>;
 
 // Generic Promise resolve callback.
 type PromiseResolve<T> = (value: T) => void;
 
-// Allow to skip the first parameter of a function.
+// Allow to skip the first argument of a function.
 type OmitFirstParam<T extends (...args: any[]) => any> = T extends (
   state: any,
   ...args: infer P
@@ -20,7 +20,7 @@ type OmitFirstParam<T extends (...args: any[]) => any> = T extends (
   ? P
   : never;
 
-const protectedKeys = ["on", "state", "getState"];
+const protectedKeys = ["on", "state", "actions"];
 
 export function createStore<S, A extends Record<string, Action<S>>>(config: {
   state: S;
@@ -120,42 +120,40 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
       globalListeners.forEach((listener) => listener(newState, "link"));
   }
 
+  // Subscribe to named and global actions.
+  function crereateListenr(
+    action: keyof Actions | ActionListener<S, A>,
+    listener?: ActionListener<S, A>
+  ) {
+    // Subscribe to global actions.
+    if (typeof action === "function" && listener === undefined) {
+      globalListeners.push(action);
+      return () => globalListeners.splice(globalListeners.indexOf(action), 1);
+    }
+
+    // Subscribe to specific actions.
+    else if (typeof action === "string" && listener) {
+      if (!actionListeners.has(action)) {
+        actionListeners.set(action, []);
+      }
+
+      actionListeners.get(action)?.push(listener);
+      return () => {
+        actionListeners
+          .get(action)
+          ?.splice(actionListeners.get(action)?.indexOf(listener) as number, 1);
+      };
+    } else {
+      throw new Error(
+        "MiniRdxError: Invalid arguments. Try: state.on(action: string, listener: ActionListener)"
+      );
+    }
+  }
+
   return {
     state: getState,
-
-    on(
-      action: keyof Actions | ActionListener<S, A>,
-      listener?: ActionListener<S, A>
-    ) {
-      // Subscribe to global actions.
-      if (typeof action === "function" && listener === undefined) {
-        globalListeners.push(action);
-        return () => globalListeners.splice(globalListeners.indexOf(action), 1);
-      }
-
-      // Subscribe to specific actions.
-      else if (typeof action === "string" && listener) {
-        if (!actionListeners.has(action)) {
-          actionListeners.set(action, []);
-        }
-
-        actionListeners.get(action)?.push(listener);
-        return () => {
-          actionListeners
-            .get(action)
-            ?.splice(
-              actionListeners.get(action)?.indexOf(listener) as number,
-              1
-            );
-        };
-      } else {
-        throw new Error(
-          "MiniRdxError: Invalid arguments. Try: state.on(action: string, listener: ActionListener)"
-        );
-      }
-    },
-
-    ...apiActions,
+    actions: apiActions,
+    on: crereateListenr,
   };
 }
 

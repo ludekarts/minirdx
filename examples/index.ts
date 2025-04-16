@@ -41,16 +41,16 @@ const store = createStore({
 });
 
 store.state().count;
-store.decrement(2, "Hello, World!");
-store.decrement(2, "Hello, World!");
-store.hello("Hello, World!");
+store.actions.decrement(2, "Hello, World!");
+store.actions.decrement(2, "Hello, World!");
+store.actions.hello("Hello, World!");
 
-store.asyncInc(5);
-store.increment(5);
+store.actions.asyncInc(5);
+store.actions.increment(5);
 
-store.state().text;
+store.state().count; // 5
 
-store.hello("Hello, World!");
+store.actions.hello("Hello, World!");
 
 store.on("hello", (state, action) => {
   console.log(`Hello action: "${action}" was called with text: ${state.text}`);

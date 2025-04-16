@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 
 export default function createStoreHooks(store: any) {
-  const { state, on, ...actions } = store;
+  const { state, on, actions } = store;
 
   function useStore(selector?: any) {
     const [data, setData] = useState(

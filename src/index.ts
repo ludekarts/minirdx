@@ -1,7 +1,7 @@
 // MiniRDX by Wojciech Ludwin, @ludekarts
 
 // Store API action.
-type Action<S> = (state: () => S, ...args: any[]) => S | Promise<S>;
+export type Action<S> = (state: () => S, ...args: any[]) => S | Promise<S>;
 
 // Action listener decelared with "store.on()"" method.
 type ActionListener<S, A> = (state: S, actionName: keyof A) => void;
@@ -22,10 +22,19 @@ type OmitFirstParam<T extends (...args: any[]) => any> = T extends (
 
 const protectedKeys = ["on", "state", "actions"];
 
+export interface Store<S, A extends Record<string, Action<S>>> {
+  state: () => S;
+  actions: { [K in keyof A]: (...args: OmitFirstParam<A[K]>) => Promise<S> };
+  on: (
+    action: keyof A | ((state: S, actionName: keyof A) => void),
+    listener?: (state: S, actionName: keyof A) => void
+  ) => () => void;
+}
+
 export function createStore<S, A extends Record<string, Action<S>>>(config: {
   state: S;
   actions: A;
-}) {
+}): Store<S, A> {
   let { state, actions } = config;
   type Actions = typeof actions;
 

@@ -1,4 +1,5 @@
 import { createStore, selector } from "../src/index";
+import createStoreHooks from "../src/react";
 
 const store = createStore({
   state: {
@@ -55,3 +56,17 @@ store.actions.hello("Hello, World!");
 store.on("hello", (state, action) => {
   console.log(`Hello action: "${action}" was called with text: ${state.text}`);
 });
+
+const { useStore, useStoreActions, useStoreListeners } =
+  createStoreHooks(store);
+
+const [s, a] = useStore();
+s.deep;
+a.hello("Hello, World!");
+
+const ac = useStoreActions();
+ac.hello("Hello, hooks!");
+
+const on = useStoreListeners();
+
+on("decrement", () => {});

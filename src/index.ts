@@ -198,18 +198,17 @@ export function selector<S, Args extends any[]>(
     state: () => S,
     ...args: OmitFirstParam<typeof action>
   ) {
-    if (isAsync(action)) {
-      return Promise.resolve(
-        (action as Function)(getter(state()), ...args),
-      ).then((result) => {
-        const newState = setter(state(), result) as S;
+    const result = (action as Function)(getter(state()), ...args);
+
+    if (isPromise(result)) {
+      return Promise.resolve(result).then((resolvedResult) => {
+        const newState = setter(state(), resolvedResult) as S;
         return { ...newState };
       });
-    } else {
-      const result = (action as Function)(getter(state()), ...args);
-      const newState = setter(state(), result) as S;
-      return { ...newState };
     }
+
+    const newState = setter(state(), result) as S;
+    return { ...newState };
   };
 }
 
@@ -261,9 +260,9 @@ function isPromise<T>(value: any): value is Promise<T> {
   );
 }
 
-function isAsync(fn: Function) {
-  return fn.constructor.name === "AsyncFunction";
-}
+// function isAsync(fn: Function) {
+//   return fn.constructor.name === "AsyncFunction";
+// }
 
 function scanObject(obj: any, callback: Function, path = "") {
   if (typeof obj !== "object" || obj === null) {

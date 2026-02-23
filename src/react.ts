@@ -7,9 +7,7 @@ export default function createStoreHooks<
 >(store: Store<S, A>) {
   const { state, on, actions } = store;
 
-  function useStore<T = S>(
-    selector?: (state: S) => T
-  ): [T, Store<S, A>["actions"]] {
+  function useStore<T = S>(selector?: (state: S) => T): T {
     const [data, setData] = useState(
       typeof selector === "function" ? selector(state()) : state()
     );
@@ -22,7 +20,7 @@ export default function createStoreHooks<
     // Subscribe & unsubscribe to store.
     useEffect(() => on(updateSlice), [data]);
 
-    return [data as T, actions];
+    return data as T;
   }
 
   function useStoreActions(): Store<S, A>["actions"] {

@@ -1,6 +1,4 @@
-import "../dist/minirdx.umd.js";
-
-const { createStore, selector, link } = MiniRdx;
+import { createStore, selector, link } from "../dist/minirdx.index.es.js";
 
 const emojiStore = createStore({
   state: {
@@ -69,7 +67,10 @@ const counterStore = createStore({
     asyncIncrement: async (state) => {
       const amount = await getRandomAmout(2000);
       console.log("async inc by", amount);
-      return { ...state(), counter: counterStore.state().counter + amount };
+      return {
+        ...state(),
+        counter: counterStore.state().counter + amount,
+      };
     },
 
     asyncDecrement: (state) => {
@@ -100,32 +101,32 @@ const buttons = document.getElementById("buttons");
 buttons.addEventListener("click", async (event) => {
   switch (event.target.dataset.action) {
     case "inc":
-      const x = counterStore.increment(1);
+      const x = counterStore.actions.increment(1);
       return console.log(x);
     case "dec":
-      return counterStore.decrement(1);
+      return counterStore.actions.decrement(1);
     case "asyncInc":
       console.log("Async inc start");
-      await counterStore.asyncIncrement();
+      await counterStore.actions.asyncIncrement();
       console.log("Async inc end");
       return;
     case "asyncDec":
       console.log("Async dec start");
-      await counterStore.asyncDecrement();
+      await counterStore.actions.asyncDecrement();
       console.log("Async dec end");
       return;
     case "deepUpdate":
-      return counterStore.deepUpdate("🤩");
+      return counterStore.actions.deepUpdate("🤩");
     case "deepUpdateAsync":
       console.log("Async Deep start");
-      await counterStore.deepUpdateAsync("💥");
+      await counterStore.actions.deepUpdateAsync("💥");
       console.log("Async Deep end");
       return;
     case "updateEmoji":
-      console.log(await emojiStore.randomEmoji());
+      console.log(await emojiStore.actions.randomEmoji());
       return;
     case "updateUsername":
-      await userStore.updateName("Joe Black");
+      await userStore.actions.updateName("Joe Black");
       return;
 
     case "show":

@@ -194,6 +194,18 @@ export function selector<S, Args extends any[]>(
 ) {
   const { getter, setter } = createSelector(path);
 
+  const cloneState = (value: S): S => {
+    if (Array.isArray(value)) {
+      return [...value] as S;
+    }
+
+    if (isObject(value)) {
+      return { ...value };
+    }
+
+    return value;
+  };
+
   return function response(
     state: () => S,
     ...args: OmitFirstParam<typeof action>
@@ -203,12 +215,12 @@ export function selector<S, Args extends any[]>(
     if (isPromise(result)) {
       return Promise.resolve(result).then((resolvedResult) => {
         const newState = setter(state(), resolvedResult) as S;
-        return { ...newState };
+        return cloneState(newState);
       });
     }
 
     const newState = setter(state(), result) as S;
-    return { ...newState };
+    return cloneState(newState);
   };
 }
 

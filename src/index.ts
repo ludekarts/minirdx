@@ -282,7 +282,7 @@ function scanObject(obj: any, callback: Function, path = "") {
   }
 
   for (const key in obj) {
-    if (obj.hasOwnProperty(key)) {
+    if (hasOwnProp(obj, key)) {
       const value = obj[key];
       const keyString = /\d+/.test(key) ? `[${key}]` : `.${key}`;
       const currentPath = path ? `${path}${keyString}` : key;
@@ -300,8 +300,12 @@ function isLink(value: any): boolean {
   return (
     value !== null &&
     typeof value === "object" &&
-    value.hasOwnProperty("_rdx_link_")
+    hasOwnProp(value, "_rdx_link_")
   );
+}
+
+function hasOwnProp(object: unknown, key: PropertyKey): boolean {
+  return Object.prototype.hasOwnProperty.call(object, key);
 }
 
 function isObject(object: any): boolean {

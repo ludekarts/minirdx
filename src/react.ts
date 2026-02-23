@@ -3,22 +3,26 @@ import type { Store, Action } from "./index";
 
 export default function createStoreHooks<
   S,
-  A extends Record<string, Action<S>>
+  A extends Record<string, Action<S>>,
 >(store: Store<S, A>) {
   const { state, on, actions } = store;
 
   function useStore<T = S>(selector?: (state: S) => T): T {
     const [data, setData] = useState(
-      typeof selector === "function" ? selector(state()) : state()
+      typeof selector === "function" ? selector(state()) : state(),
     );
 
-    const updateSlice = (state: S) => {
-      const slice = typeof selector === "function" ? selector(state) : state;
-      slice !== data && setData(slice);
-    };
-
     // Subscribe & unsubscribe to store.
-    useEffect(() => on(updateSlice), [data]);
+    useEffect(() => {
+      const updateSlice = (nextState: S) => {
+        const slice =
+          typeof selector === "function" ? selector(nextState) : nextState;
+
+        setData((prev) => (Object.is(prev, slice) ? prev : slice));
+      };
+
+      return on(updateSlice);
+    }, [on, selector]);
 
     return data as T;
   }

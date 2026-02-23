@@ -148,7 +148,12 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
     // Subscribe to global actions.
     if (typeof action === "function" && listener === undefined) {
       globalListeners.push(action);
-      return () => globalListeners.splice(globalListeners.indexOf(action), 1);
+      return () => {
+        const actionIndex = globalListeners.indexOf(action);
+        if (actionIndex >= 0) {
+          globalListeners.splice(actionIndex, 1);
+        }
+      };
     }
 
     // Subscribe to specific actions.
@@ -159,9 +164,13 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
 
       actionListeners.get(action)?.push(listener);
       return () => {
-        actionListeners
-          .get(action)
-          ?.splice(actionListeners.get(action)?.indexOf(listener) as number, 1);
+        const listeners = actionListeners.get(action);
+        if (!listeners) return;
+
+        const listenerIndex = listeners.indexOf(listener);
+        if (listenerIndex >= 0) {
+          listeners.splice(listenerIndex, 1);
+        }
       };
     } else {
       throw new Error(

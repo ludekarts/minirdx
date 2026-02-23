@@ -12,6 +12,9 @@ type ActionListenerColection<S, A> = Map<string, ActionListener<S, A>[]>;
 // Generic Promise resolve callback.
 type PromiseResolve<T> = (value: T) => void;
 
+// Generic Promise reject callback.
+type PromiseReject = (reason?: unknown) => void;
+
 // Allow to skip the first argument of a function.
 type OmitFirstParam<T extends (...args: any[]) => any> = T extends (
   state: any,
@@ -27,7 +30,7 @@ export interface Store<S, A extends Record<string, Action<S>>> {
   actions: { [K in keyof A]: (...args: OmitFirstParam<A[K]>) => Promise<S> };
   on: (
     action: keyof A | ((state: S, actionName: keyof A) => void),
-    listener?: (state: S, actionName: keyof A) => void
+    listener?: (state: S, actionName: keyof A) => void,
   ) => () => void;
 }
 
@@ -69,15 +72,16 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
       return [
         key,
         (...args: OmitFirstParam<typeof action>) =>
-          new Promise((resolve) => {
+          new Promise((resolve, reject) => {
             resolver(
               key,
               (state: () => S) => (action as Function)(state, ...args),
-              resolve
+              resolve,
+              reject,
             );
           }),
       ];
-    })
+    }),
   ) as {
     [K in keyof A]: (...args: OmitFirstParam<A[K]>) => Promise<S>;
   };
@@ -85,20 +89,27 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
   function resolver(
     actionName: string,
     action: Action<S>,
-    resolve: PromiseResolve<S>
+    resolve: PromiseResolve<S>,
+    reject: PromiseReject,
   ) {
-    const newState = action(getState);
-    isPromise<S>(newState)
-      ? newState.then((resolvedState: S) =>
-          updateState(resolvedState, actionName, resolve)
-        )
-      : updateState(newState, actionName, resolve);
+    try {
+      const newState = action(getState);
+      isPromise<S>(newState)
+        ? newState
+            .then((resolvedState: S) =>
+              updateState(resolvedState, actionName, resolve),
+            )
+            .catch(reject)
+        : updateState(newState, actionName, resolve);
+    } catch (error) {
+      reject(error);
+    }
   }
 
   function updateState(
     newState: S,
     actionName: string,
-    resolve: PromiseResolve<S>
+    resolve: PromiseResolve<S>,
   ) {
     state = newState;
 
@@ -132,7 +143,7 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
   // Subscribe to named and global actions.
   function crereateListenr(
     action: keyof Actions | ActionListener<S, A>,
-    listener?: ActionListener<S, A>
+    listener?: ActionListener<S, A>,
   ) {
     // Subscribe to global actions.
     if (typeof action === "function" && listener === undefined) {
@@ -154,7 +165,7 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
       };
     } else {
       throw new Error(
-        "MiniRdxError: Invalid arguments. Try: state.on(action: string, listener: ActionListener)"
+        "MiniRdxError: Invalid arguments. Try: state.on(action: string, listener: ActionListener)",
       );
     }
   }
@@ -170,7 +181,7 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
 
 export function selector<S, Args extends any[]>(
   path: string,
-  action: (...args: Args) => any
+  action: (...args: Args) => any,
 ) {
   const { getter, setter } = createSelector(path);
 
@@ -180,7 +191,7 @@ export function selector<S, Args extends any[]>(
   ) {
     if (isAsync(action)) {
       return Promise.resolve(
-        (action as Function)(getter(state()), ...args)
+        (action as Function)(getter(state()), ...args),
       ).then((result) => {
         const newState = setter(state(), result) as S;
         return { ...newState };
@@ -205,13 +216,13 @@ export function createSelector<V>(selector: string): SelectorObject<V> {
       setter: new Function(
         "state",
         "value",
-        `{${selector} = value; return state;}`
+        `{${selector} = value; return state;}`,
       ),
     } as SelectorObject<V>;
   }
 
   throw new Error(
-    `MiniRDXError: Selector should be a string with dot notation starting with "state." e.g.: "state.user.cars[1].model" `
+    `MiniRDXError: Selector should be a string with dot notation starting with "state." e.g.: "state.user.cars[1].model" `,
   );
 }
 

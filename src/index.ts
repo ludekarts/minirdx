@@ -138,6 +138,7 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
     const newState = (
       isObject(state) ? { ...state } : Array.isArray(state) ? [...state] : state
     ) as S;
+    state = newState;
     globalListeners.length &&
       globalListeners.forEach((listener) => listener(newState, "link"));
   }

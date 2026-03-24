@@ -331,10 +331,21 @@ function isPromise<T>(value: any): value is Promise<T> {
 //   return fn.constructor.name === "AsyncFunction";
 // }
 
-function scanObject(obj: any, callback: Function, path = "") {
+function scanObject(
+  obj: any,
+  callback: Function,
+  path = "",
+  visited: WeakSet<object> = new WeakSet(),
+) {
   if (typeof obj !== "object" || obj === null) {
     return;
   }
+
+  if (visited.has(obj)) {
+    return;
+  }
+
+  visited.add(obj);
 
   for (const key in obj) {
     if (hasOwnProp(obj, key)) {
@@ -345,7 +356,7 @@ function scanObject(obj: any, callback: Function, path = "") {
       callback(value, currentPath);
 
       if (typeof value === "object" && value !== null) {
-        scanObject(value, callback, currentPath);
+        scanObject(value, callback, currentPath, visited);
       }
     }
   }

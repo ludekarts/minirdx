@@ -11,6 +11,12 @@ type ActionListener<S, A> = (state: S, actionName: ActionEventName<A>) => void;
 // Internal collection of all action listeners.
 type ActionListenerCollection<S, A> = Map<string, ActionListener<S, A>[]>;
 
+// Middleware function declared with "store.tap()" method.
+type Middleware<S> = (state: S, actionName: string) => S | Promise<S>;
+
+// Internal collection of all middleware.
+type MiddlewareCollection<S> = Map<string, Middleware<S>[]>;
+
 // Generic Promise resolve callback.
 type PromiseResolve<T> = (value: T) => void;
 
@@ -25,7 +31,7 @@ type OmitFirstParam<T extends (...args: any[]) => any> = T extends (
   ? P
   : never;
 
-const protectedKeys = ["on", "state", "actions"];
+const protectedKeys = ["on", "tap", "state", "actions"];
 
 export interface Store<S, A extends Record<string, Action<S>>> {
   state: () => S;
@@ -33,6 +39,10 @@ export interface Store<S, A extends Record<string, Action<S>>> {
   on: (
     action: keyof A | ((state: S, actionName: ActionEventName<A>) => void),
     listener?: (state: S, actionName: ActionEventName<A>) => void,
+  ) => () => void;
+  tap: (
+    action: keyof A | ((state: S, actionName: string) => S | Promise<S>),
+    middleware?: (state: S, actionName: string) => S | Promise<S>,
   ) => () => void;
 }
 
@@ -45,6 +55,8 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
 
   const globalListeners: ActionListener<S, A>[] = [];
   const actionListeners: ActionListenerCollection<S, A> = new Map();
+
+  const middlewareCollection: MiddlewareCollection<S> = new Map();
 
   // Scan State object and pull out all linked values.
 
@@ -95,17 +107,31 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
     reject: PromiseReject,
   ) {
     try {
-      const newState = action(getState);
-      isPromise<S>(newState)
-        ? newState
-            .then((resolvedState: S) =>
-              updateState(resolvedState, actionName, resolve),
-            )
-            .catch(reject)
-        : updateState(newState, actionName, resolve);
+      const middlewareToRun = getAllMiddleware(actionName);
+
+      Promise.resolve(action(getState))
+        .then((resolvedState) =>
+          applyMiddleware(resolvedState, actionName, middlewareToRun),
+        )
+        .then((finalState) => updateState(finalState, actionName, resolve))
+        .catch(reject);
     } catch (error) {
       reject(error);
     }
+  }
+
+  function applyMiddleware(
+    nextState: S,
+    actionName: string,
+    middlewareList: Middleware<S>[],
+  ): Promise<S> {
+    return middlewareList.reduce(
+      (statePromise, middleware) =>
+        statePromise.then((currentState) =>
+          Promise.resolve(middleware(currentState, actionName)),
+        ),
+      Promise.resolve(nextState),
+    );
   }
 
   function updateState(
@@ -143,7 +169,7 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
       globalListeners.forEach((listener) => listener(newState, "link"));
   }
 
-  // Subscribe to named and global actions.
+  // Subscribe to named / global actions.
   function createListener(
     action: keyof Actions | ActionListener<S, A>,
     listener?: ActionListener<S, A>,
@@ -186,10 +212,60 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
     }
   }
 
+  function registerMiddleware(
+    action: keyof Actions | Middleware<S>,
+    middleware?: Middleware<S>,
+  ) {
+    const IS_GLOBAL_MIDDLEWARE =
+      typeof action === "function" && middleware === undefined;
+    const IS_ACTION_MIDDLEWARE =
+      typeof action === "string" && typeof middleware === "function";
+
+    const actionName = IS_GLOBAL_MIDDLEWARE
+      ? "*"
+      : IS_ACTION_MIDDLEWARE
+        ? action
+        : null;
+
+    const middlewareToSet: Middleware<S> =
+      typeof middleware === "function" ? middleware : (action as Middleware<S>);
+
+    if (actionName === null || typeof middlewareToSet !== "function") {
+      throw new Error(
+        "MiniRdxError: Invalid arguments. Try: state.tap(actionName, middleware)",
+      );
+    }
+
+    // Initialize action middleware.
+    !middlewareCollection.has(actionName) &&
+      middlewareCollection.set(actionName, []);
+
+    // Add middleware to proper action.
+    middlewareCollection.get(actionName)?.push(middlewareToSet);
+
+    // Return an unsubscribe function.
+    return () => {
+      const listeners = middlewareCollection.get(actionName);
+      if (!listeners) return;
+
+      const listenerIndex = listeners.indexOf(middlewareToSet);
+      if (listenerIndex >= 0) {
+        listeners.splice(listenerIndex, 1);
+      }
+    };
+  }
+
+  function getAllMiddleware(actionName: string) {
+    const globalMiddleware = middlewareCollection.get("*") || [];
+    const actionMiddleware = middlewareCollection.get(actionName) || [];
+    return [...globalMiddleware, ...actionMiddleware];
+  }
+
   return {
     state: getState,
-    actions: apiActions,
     on: createListener,
+    actions: apiActions,
+    tap: registerMiddleware,
   };
 }
 
@@ -326,10 +402,6 @@ function isPromise<T>(value: any): value is Promise<T> {
     typeof value.then === "function"
   );
 }
-
-// function isAsync(fn: Function) {
-//   return fn.constructor.name === "AsyncFunction";
-// }
 
 function scanObject(
   obj: any,

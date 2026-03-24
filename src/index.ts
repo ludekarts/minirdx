@@ -233,7 +233,7 @@ export function selector<S, Args extends any[]>(
 
 type SelectorObject<V> = {
   getter: (state: unknown) => V;
-  setter: (_state: unknown, value: V) => V;
+  setter: (state: unknown, value: V) => V;
 };
 
 export function createSelector<V>(selector: string): SelectorObject<V> {

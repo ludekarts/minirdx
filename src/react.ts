@@ -11,9 +11,12 @@ export default function createStoreHooks<
     selector?: (state: S) => T,
     equalityFn?: (prev: T, next: T) => boolean,
   ): T {
-    const [data, setData] = useState(
-      typeof selector === "function" ? selector(state()) : state(),
-    );
+    const initialData =
+      typeof selector === "function"
+        ? selector(state())
+        : (state() as unknown as T);
+
+    const [data, setData] = useState<T>(initialData);
 
     // Subscribe & unsubscribe to store.
     useEffect(() => {
@@ -24,9 +27,11 @@ export default function createStoreHooks<
 
       const updateSlice = (nextState: S) => {
         const slice =
-          typeof selector === "function" ? selector(nextState) : nextState;
+          typeof selector === "function"
+            ? selector(nextState)
+            : (nextState as unknown as T);
 
-        setData((prev) => (isEqual(prev, slice as T) ? prev : (slice as T)));
+        setData((prev) => (isEqual(prev, slice) ? prev : slice));
       };
 
       return on(updateSlice);

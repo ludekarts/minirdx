@@ -9,7 +9,7 @@ type ActionEventName<A> = keyof A | "link";
 type ActionListener<S, A> = (state: S, actionName: ActionEventName<A>) => void;
 
 // Internal collection of all action listeners.
-type ActionListenerColection<S, A> = Map<string, ActionListener<S, A>[]>;
+type ActionListenerCollection<S, A> = Map<string, ActionListener<S, A>[]>;
 
 // Generic Promise resolve callback.
 type PromiseResolve<T> = (value: T) => void;
@@ -44,7 +44,7 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
   type Actions = typeof actions;
 
   const globalListeners: ActionListener<S, A>[] = [];
-  const actionListeners: ActionListenerColection<S, A> = new Map();
+  const actionListeners: ActionListenerCollection<S, A> = new Map();
 
   // Scan State object and pull out all linked values.
 
@@ -144,7 +144,7 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
   }
 
   // Subscribe to named and global actions.
-  function crereateListenr(
+  function createListener(
     action: keyof Actions | ActionListener<S, A>,
     listener?: ActionListener<S, A>,
   ) {
@@ -189,7 +189,7 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
   return {
     state: getState,
     actions: apiActions,
-    on: crereateListenr,
+    on: createListener,
   };
 }
 

@@ -237,20 +237,68 @@ type SelectorObject<V> = {
 };
 
 export function createSelector<V>(selector: string): SelectorObject<V> {
-  if (/^state\.[\w\[\]\d\.]+$/.test(selector)) {
-    return {
-      getter: new Function("state", `return ${selector}`),
-      setter: new Function(
-        "state",
-        "value",
-        `{${selector} = value; return state;}`,
-      ),
-    } as SelectorObject<V>;
+  const path = parseSelectorPath(selector);
+
+  return {
+    getter: (state: unknown) => {
+      let current: any = state;
+
+      for (const key of path) {
+        current = current[key as keyof typeof current];
+      }
+
+      return current as V;
+    },
+    setter: (state: unknown, value: V) => {
+      let current: any = state;
+
+      for (let i = 0; i < path.length - 1; i++) {
+        current = current[path[i] as keyof typeof current];
+      }
+
+      current[path[path.length - 1] as keyof typeof current] = value;
+      return state as V;
+    },
+  } as SelectorObject<V>;
+}
+
+function parseSelectorPath(selector: string): Array<string | number> {
+  if (!/^state(?:\.[A-Za-z_$][\w$]*|\[\d+\])+$/.test(selector)) {
+    throw new Error(
+      `MiniRDXError: Selector should be a string with dot notation starting with "state." e.g.: "state.user.cars[1].model" `,
+    );
   }
 
-  throw new Error(
-    `MiniRDXError: Selector should be a string with dot notation starting with "state." e.g.: "state.user.cars[1].model" `,
-  );
+  const path = selector.slice("state.".length);
+  const tokens: Array<string | number> = [];
+  let index = 0;
+
+  while (index < path.length) {
+    const char = path[index];
+
+    if (char === ".") {
+      index++;
+      continue;
+    }
+
+    if (char === "[") {
+      const endBracket = path.indexOf("]", index + 1);
+      const token = path.slice(index + 1, endBracket);
+      tokens.push(Number(token));
+      index = endBracket + 1;
+      continue;
+    }
+
+    let end = index;
+    while (end < path.length && /[\w$]/.test(path[end])) {
+      end++;
+    }
+
+    tokens.push(path.slice(index, end));
+    index = end;
+  }
+
+  return tokens;
 }
 
 // ---- Link values --------------

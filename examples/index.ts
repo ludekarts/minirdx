@@ -36,37 +36,42 @@ const store = createStore({
       async (count: number, amount: number, text: string) => {
         console.log(text);
         return count - amount;
-      }
+      },
     ),
   },
 });
 
-store.state().count;
-store.actions.decrement(2, "Hello, World!");
-store.actions.decrement(2, "Hello, World!");
-store.actions.hello("Hello, World!");
+(async function test() {
+  store.state().count;
+  store.actions.decrement(2, "Hello, World!");
+  store.actions.decrement(2, "Hello, World!");
+  store.actions.hello("Hello, World!");
 
-store.actions.asyncInc(5);
-store.actions.increment(5);
+  store.actions.asyncInc(5);
+  store.actions.increment(5);
 
-store.state().count; // 5
+  store.state().count; // 5
 
-store.actions.hello("Hello, World!");
+  store.actions.hello("Hello, World!");
 
-store.on("hello", (state, action) => {
-  console.log(`Hello action: "${action}" was called with text: ${state.text}`);
-});
+  store.on("hello", (state, action) => {
+    console.log(
+      `Hello action: "${action}" was called with text: ${state.text}`,
+    );
+  });
 
-const { useStore, useStoreActions, useStoreListeners } =
-  createStoreHooks(store);
+  const { useStore, useStoreActions, useStoreListeners } =
+    createStoreHooks(store);
 
-const [s, a] = useStore();
-s.deep;
-a.hello("Hello, World!");
+  const s = useStore();
+  const a = useStoreActions();
+  s.deep;
+  a.hello("Hello, World!");
 
-const ac = useStoreActions();
-ac.hello("Hello, hooks!");
+  const ac = useStoreActions();
+  ac.hello("Hello, hooks!");
 
-const on = useStoreListeners();
+  const on = useStoreListeners();
 
-on("decrement", () => {});
+  on("decrement", () => {});
+})();

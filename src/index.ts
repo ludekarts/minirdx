@@ -3,8 +3,10 @@
 // Store API action.
 export type Action<S> = (state: () => S, ...args: any[]) => S | Promise<S>;
 
+type ActionEventName<A> = keyof A | "link";
+
 // Action listener decelared with "store.on()"" method.
-type ActionListener<S, A> = (state: S, actionName: keyof A) => void;
+type ActionListener<S, A> = (state: S, actionName: ActionEventName<A>) => void;
 
 // Internal collection of all action listeners.
 type ActionListenerColection<S, A> = Map<string, ActionListener<S, A>[]>;
@@ -29,8 +31,8 @@ export interface Store<S, A extends Record<string, Action<S>>> {
   state: () => S;
   actions: { [K in keyof A]: (...args: OmitFirstParam<A[K]>) => Promise<S> };
   on: (
-    action: keyof A | ((state: S, actionName: keyof A) => void),
-    listener?: (state: S, actionName: keyof A) => void,
+    action: keyof A | ((state: S, actionName: ActionEventName<A>) => void),
+    listener?: (state: S, actionName: ActionEventName<A>) => void,
   ) => () => void;
 }
 
@@ -148,6 +150,8 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
     // Subscribe to global actions.
     if (typeof action === "function" && listener === undefined) {
       globalListeners.push(action);
+
+      // Return an unsubscribe function.
       return () => {
         const actionIndex = globalListeners.indexOf(action);
         if (actionIndex >= 0) {
@@ -163,6 +167,8 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
       }
 
       actionListeners.get(action)?.push(listener);
+
+      // Return an unsubscribe function.
       return () => {
         const listeners = actionListeners.get(action);
         if (!listeners) return;

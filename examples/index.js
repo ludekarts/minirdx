@@ -88,7 +88,7 @@ const counterStore = createStore({
         await wait(2000);
         return "🎁";
         // return value === "🤯" ? emoji : "🤯";
-      }
+      },
     ),
   },
 });
@@ -101,7 +101,7 @@ const buttons = document.getElementById("buttons");
 buttons.addEventListener("click", async (event) => {
   switch (event.target.dataset.action) {
     case "inc":
-      const x = counterStore.actions.increment(1);
+      const x = await counterStore.actions.increment(1);
       return console.log(x);
     case "dec":
       return counterStore.actions.decrement(1);
@@ -119,8 +119,8 @@ buttons.addEventListener("click", async (event) => {
       return counterStore.actions.deepUpdate("🤩");
     case "deepUpdateAsync":
       console.log("Async Deep start");
-      await counterStore.actions.deepUpdateAsync("💥");
-      console.log("Async Deep end");
+      const deepUpdateResult = await counterStore.actions.deepUpdateAsync("💥");
+      console.log("Async Deep end", deepUpdateResult);
       return;
     case "updateEmoji":
       console.log(await emojiStore.actions.randomEmoji());
@@ -140,15 +140,15 @@ const cancelGlobalSub = counterStore.on((state, actionName) => {
 });
 
 const cancelIncSub = counterStore.on("increment", (state) =>
-  console.log("⬆️", state.counter)
+  console.log("⬆️", state.counter),
 );
 
 const cancelDecSub = counterStore.on("decrement", (state) =>
-  console.log("⬇️", state.counter)
+  console.log("⬇️", state.counter),
 );
 
 const cancelDeepSub = counterStore.on("deepUpdate", (state) =>
-  console.log("DEEP", state.deep.nested.value)
+  console.log("DEEP", state.deep.nested.value),
 );
 
 function getRandomAmout(delay = 1000) {

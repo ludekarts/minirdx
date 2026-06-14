@@ -12,7 +12,7 @@ type ActionListener<S, A> = (state: S, actionName: ActionEventName<A>) => void;
 type ActionListenerCollection<S, A> = Map<string, ActionListener<S, A>[]>;
 
 // Middleware function declared with "store.tap()" method.
-type Middleware<S> = (state: S, actionName: string) => S | Promise<S>;
+type Middleware<S> = (state: () => S, actionName: string) => S | Promise<S>;
 
 // Internal collection of all middleware.
 type MiddlewareCollection<S> = Map<string, Middleware<S>[]>;
@@ -41,8 +41,8 @@ export interface Store<S, A extends Record<string, Action<S>>> {
     listener?: (state: S, actionName: ActionEventName<A>) => void,
   ) => () => void;
   tap: (
-    action: keyof A | ((state: S, actionName: string) => S | Promise<S>),
-    middleware?: (state: S, actionName: string) => S | Promise<S>,
+    action: keyof A | Middleware<S>,
+    middleware?: Middleware<S>,
   ) => () => void;
 }
 
@@ -87,12 +87,7 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
         key,
         (...args: OmitFirstParam<typeof action>) =>
           new Promise((resolve, reject) => {
-            resolver(
-              key,
-              (state: () => S) => (action as Function)(state, ...args),
-              resolve,
-              reject,
-            );
+            resolver(key, action, args, resolve, reject);
           }),
       ];
     }),
@@ -103,34 +98,38 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
   function resolver(
     actionName: string,
     action: Action<S>,
+    actionArgs: any[],
     resolve: PromiseResolve<S>,
     reject: PromiseReject,
   ) {
     try {
       const middlewareToRun = getAllMiddleware(actionName);
+      const actionFn = (state: () => S) =>
+        (action as Function)(state, ...actionArgs);
 
-      Promise.resolve(action(getState))
-        .then((resolvedState) =>
-          applyMiddleware(resolvedState, actionName, middlewareToRun),
+      runMiddlewarePipeline(middlewareToRun, actionName)
+        .then(() => Promise.resolve(actionFn(getState)))
+        .then((resolvedState: S) =>
+          updateState(resolvedState, actionName, resolve),
         )
-        .then((finalState) => updateState(finalState, actionName, resolve))
         .catch(reject);
     } catch (error) {
       reject(error);
     }
   }
 
-  function applyMiddleware(
-    nextState: S,
+  function runMiddlewarePipeline(
+    middlewareToRun: Middleware<S>[],
     actionName: string,
-    middlewareList: Middleware<S>[],
-  ): Promise<S> {
-    return middlewareList.reduce(
-      (statePromise, middleware) =>
-        statePromise.then((currentState) =>
-          Promise.resolve(middleware(currentState, actionName)),
-        ),
-      Promise.resolve(nextState),
+  ): Promise<void> {
+    return middlewareToRun.reduce(
+      (chain, middleware) =>
+        chain
+          .then(() => Promise.resolve(middleware(getState, actionName)))
+          .then((nextState) => {
+            state = nextState;
+          }),
+      Promise.resolve(),
     );
   }
 

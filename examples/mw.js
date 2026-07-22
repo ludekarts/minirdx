@@ -30,6 +30,10 @@ store.on("increment", (state) => {
   console.log("Counter incremented to", state.counter);
 });
 
+store.on("decrement", (state) => {
+  console.log("Counter decremented to", state.counter);
+});
+
 store.tap("decrement", async (state) => {
   await wait(1000);
   // State powine być funkcją zwracającą aktualny stan, a nie sam stan, ponieważ może być on już zaktualizowany przez inne akcje

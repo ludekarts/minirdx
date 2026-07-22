@@ -55,7 +55,6 @@ export function createStore<S, A extends Record<string, Action<S>>>(config: {
 
   const globalListeners: ActionListener<S, A>[] = [];
   const actionListeners: ActionListenerCollection<S, A> = new Map();
-
   const middlewareCollection: MiddlewareCollection<S> = new Map();
 
   // Scan State object and pull out all linked values.

@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import type { Store, Action } from "./index";
 
-export default function createStoreHooks<
-  S,
-  A extends Record<string, Action<S>>,
->(store: Store<S, A>) {
+export * from "./index";
+
+export function createStoreHooks<S, A extends Record<string, Action<S>>>(
+  store: Store<S, A>,
+) {
   const { state, on, actions } = store;
 
   function useStore<T = S>(

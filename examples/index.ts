@@ -1,5 +1,4 @@
-import { createStore, selector } from "../src/index";
-import createStoreHooks from "../src/react";
+import { createStoreHooks, createStore, selector } from "../src/react";
 
 const store = createStore({
   state: {

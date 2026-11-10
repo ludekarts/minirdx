@@ -1,28 +1,44 @@
 import { useState, useEffect } from "react";
 import type { Store, Action } from "./index";
 
-export default function createStoreHooks<
-  S,
-  A extends Record<string, Action<S>>
->(store: Store<S, A>) {
+export * from "./index";
+
+export function createStoreHooks<S, A extends Record<string, Action<S>>>(
+  store: Store<S, A>,
+) {
   const { state, on, actions } = store;
 
   function useStore<T = S>(
-    selector?: (state: S) => T
-  ): [T, Store<S, A>["actions"]] {
-    const [data, setData] = useState(
-      typeof selector === "function" ? selector(state()) : state()
-    );
+    selector?: (state: S) => T,
+    equalityFn?: (prev: T, next: T) => boolean,
+  ): T {
+    const initialData =
+      typeof selector === "function"
+        ? selector(state())
+        : (state() as unknown as T);
 
-    const updateSlice = (state: S) => {
-      const slice = typeof selector === "function" ? selector(state) : state;
-      slice !== data && setData(slice);
-    };
+    const [data, setData] = useState<T>(initialData);
 
     // Subscribe & unsubscribe to store.
-    useEffect(() => on(updateSlice), [data]);
+    useEffect(() => {
+      const isEqual =
+        typeof equalityFn === "function"
+          ? equalityFn
+          : (prev: T, next: T) => Object.is(prev, next);
 
-    return [data as T, actions];
+      const updateSlice = (nextState: S) => {
+        const slice =
+          typeof selector === "function"
+            ? selector(nextState)
+            : (nextState as unknown as T);
+
+        setData((prev) => (isEqual(prev, slice) ? prev : slice));
+      };
+
+      return on(updateSlice);
+    }, [on, selector, equalityFn]);
+
+    return data as T;
   }
 
   function useStoreActions(): Store<S, A>["actions"] {
